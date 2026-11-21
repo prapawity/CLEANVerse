@@ -159,6 +159,7 @@ class DevFolder {
     this.projectMarker,
     this.modified,
     this.locationSource,
+    this.risk = CleanupRisk.review,
   });
   final String path;
   final String category;
@@ -167,6 +168,7 @@ class DevFolder {
   final String? projectMarker;
   final DateTime? modified;
   final String? locationSource;
+  final CleanupRisk risk;
 }
 
 /// Candidates only; a tool's config file or command-line flags may override these paths.
@@ -303,6 +305,24 @@ List<DevFolder> globalCacheCandidates(
         'Archives can contain unique release builds and debug symbols. Do not assume they can be recreated.',
         locationSource:
             'Possible default location; Xcode settings may use another path',
+        risk: CleanupRisk.potentiallyImportant,
+      ),
+    if (xcodeHome != null)
+      DevFolder(
+        p.join(xcodeHome, 'iOS DeviceSupport'),
+        'Xcode iOS device support',
+        'May contain device debugging symbols. Removing it can require Xcode to copy them again and affect debugging.',
+        locationSource:
+            'Conventional location; Xcode versions and settings may differ',
+      ),
+    if (macos && home != null)
+      DevFolder(
+        p.join(home, 'Library', 'Developer', 'CoreSimulator', 'Devices'),
+        'Simulator device data',
+        'May contain simulator apps, settings and user data. Do not assume this data can be recreated.',
+        locationSource:
+            'Conventional location; Simulator versions and settings may differ',
+        risk: CleanupRisk.potentiallyImportant,
       ),
   ];
 }
@@ -509,6 +529,7 @@ class LocalFolderScanner implements FolderScanner {
           projectMarker: candidate.projectMarker,
           modified: info.modified,
           locationSource: candidate.locationSource,
+          risk: candidate.risk,
         ),
       );
       folderBytes[candidate.path] = 0;
@@ -715,6 +736,7 @@ class LocalFolderScanner implements FolderScanner {
             projectMarker: folder.projectMarker,
             modified: folder.modified,
             locationSource: folder.locationSource,
+            risk: folder.risk,
           ),
         ),
       ),
@@ -795,9 +817,7 @@ class FolderScanViewModel extends ChangeNotifier {
             category: folder.category,
             note: folder.note,
             logicalBytes: folder.logicalBytes,
-            risk: folder.category == 'Xcode archives'
-                ? CleanupRisk.potentiallyImportant
-                : CleanupRisk.review,
+            risk: folder.risk,
             projectMarker: folder.projectMarker,
             locationSource: folder.locationSource,
           ),

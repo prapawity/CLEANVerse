@@ -343,7 +343,11 @@ Widget _developerFolderCard(
           Text(
             'Folder modified: ${folder.modified!.toLocal().toString().split('.').first} (not last used)',
           ),
-        const Text('Review required · Ownership and active use not verified'),
+        Text(
+          folder.risk == CleanupRisk.potentiallyImportant
+              ? 'May contain important data · Ownership and active use not verified'
+              : 'Review required · Ownership and active use not verified',
+        ),
         Text(folder.note),
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,
