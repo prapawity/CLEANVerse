@@ -27,11 +27,20 @@ class FolderScanResult {
 }
 
 class DevFolder {
-  const DevFolder(this.path, this.category, this.note, {this.logicalBytes = 0});
+  const DevFolder(
+    this.path,
+    this.category,
+    this.note, {
+    this.logicalBytes = 0,
+    this.projectMarker,
+    this.modified,
+  });
   final String path;
   final String category;
   final String note;
   final int logicalBytes;
+  final String? projectMarker;
+  final DateTime? modified;
 }
 
 Future<DevFolder?> classifyDevFolder(String path) async {
@@ -48,6 +57,7 @@ Future<DevFolder?> classifyDevFolder(String path) async {
       path,
       'Node.js dependencies',
       'Reinstalling may require network access and can change the working environment.',
+      projectMarker: p.join(parent, 'package.json'),
     );
   }
   if (name == 'target' && await hasMarker('Cargo.toml')) {
@@ -55,6 +65,7 @@ Future<DevFolder?> classifyDevFolder(String path) async {
       path,
       'Rust build output',
       'Build output is recreated by future builds, which may take longer.',
+      projectMarker: p.join(parent, 'Cargo.toml'),
     );
   }
   if (name == '.dart_tool' && await hasMarker('pubspec.yaml')) {
@@ -62,18 +73,63 @@ Future<DevFolder?> classifyDevFolder(String path) async {
       path,
       'Dart / Flutter project data',
       'Tooling may need to resolve dependencies again.',
+      projectMarker: p.join(parent, 'pubspec.yaml'),
     );
   }
-  if (name == '.gradle' &&
-      (await hasMarker('settings.gradle') ||
-          await hasMarker('settings.gradle.kts') ||
-          await hasMarker('build.gradle') ||
-          await hasMarker('build.gradle.kts'))) {
+  if (name == '.gradle') {
+    for (final marker in [
+      'settings.gradle',
+      'settings.gradle.kts',
+      'build.gradle',
+      'build.gradle.kts',
+    ]) {
+      if (await hasMarker(marker)) {
+        return DevFolder(
+          path,
+          'Gradle project cache',
+          'Gradle may need to rebuild caches and download dependencies.',
+          projectMarker: p.join(parent, marker),
+        );
+      }
+    }
+  }
+  if (name == '.build' && await hasMarker('Package.swift')) {
     return DevFolder(
       path,
-      'Gradle project cache',
-      'Gradle may need to rebuild caches and download dependencies.',
+      'Swift package build output',
+      'Build output may need to be regenerated and dependencies fetched.',
+      projectMarker: p.join(parent, 'Package.swift'),
     );
+  }
+  if (name == 'Pods') {
+    for (final marker in ['Podfile', 'Podfile.lock']) {
+      if (await hasMarker(marker)) {
+        return DevFolder(
+          path,
+          'CocoaPods dependencies',
+          'Reinstalling pods may require network access and compatible tool versions.',
+          projectMarker: p.join(parent, marker),
+        );
+      }
+    }
+  }
+  if (name == '.pytest_cache' || name == '.mypy_cache') {
+    for (final marker in [
+      'pyproject.toml',
+      'setup.py',
+      'setup.cfg',
+      'pytest.ini',
+      'mypy.ini',
+    ]) {
+      if (await hasMarker(marker)) {
+        return DevFolder(
+          path,
+          'Python tool cache',
+          'The tool may need to recompute cached data.',
+          projectMarker: p.join(parent, marker),
+        );
+      }
+    }
   }
   return null;
 }
@@ -158,7 +214,16 @@ class LocalFolderScanner implements FolderScanner {
                 final detected = await classifyDevFolder(entity.path);
                 if (detected != null) {
                   if (devFolders.length < 200) {
-                    devFolders.add(detected);
+                    final info = await entity.stat();
+                    devFolders.add(
+                      DevFolder(
+                        detected.path,
+                        detected.category,
+                        detected.note,
+                        projectMarker: detected.projectMarker,
+                        modified: info.modified,
+                      ),
+                    );
                     folderBytes[detected.path] = 0;
                   } else {
                     skipped++;
@@ -275,6 +340,8 @@ class LocalFolderScanner implements FolderScanner {
             folder.category,
             folder.note,
             logicalBytes: folderBytes[folder.path]!,
+            projectMarker: folder.projectMarker,
+            modified: folder.modified,
           ),
         ),
       ),

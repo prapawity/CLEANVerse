@@ -29,6 +29,7 @@ class FakeFolderScanner implements FolderScanner {
               'chosen/project/node_modules',
               'Node.js dependencies',
               'Review before cleanup.',
+              projectMarker: 'chosen/project/package.json',
             ),
           ]
         : const [],
@@ -132,6 +133,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Developer folders: 1'), findsOneWidget);
     expect(find.textContaining('Node.js dependencies'), findsOneWidget);
+    expect(
+      find.text('Project marker: chosen/project/package.json'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Review required · Ownership and active use not verified'),
+      findsOneWidget,
+    );
     expect(
       find.textContaining('Sizes are logical bytes scanned'),
       findsOneWidget,

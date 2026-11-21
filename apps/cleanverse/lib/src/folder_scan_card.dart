@@ -191,6 +191,17 @@ class _FolderScanCardState extends State<FolderScanCard> {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       SelectableText(folder.path),
+                      if (folder.projectMarker != null)
+                        SelectableText(
+                          'Project marker: ${folder.projectMarker}',
+                        ),
+                      if (folder.modified != null)
+                        Text(
+                          'Folder modified: ${folder.modified!.toLocal().toString().split('.').first} (not last used)',
+                        ),
+                      const Text(
+                        'Review required · Ownership and active use not verified',
+                      ),
                       Text(folder.note),
                     ],
                   ),

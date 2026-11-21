@@ -4,7 +4,7 @@ Status: experimental read-only discovery, 2026-11-21. No deletion, whole-machine
 
 ## Supported candidates
 
-Within the chosen root, detect `node_modules` with a parent `package.json`, `target` with a parent `Cargo.toml`, `.dart_tool` with a parent `pubspec.yaml`, and `.gradle` with a parent Gradle settings/build file. These patterns identify candidates, not proof that content is disposable. Limit results to 200 and report overflow in skipped items. Preserve user data and never run tool commands or delete files automatically.
+Within the chosen root, detect `node_modules` with a parent `package.json`, `target` with a parent `Cargo.toml`, `.dart_tool` with a parent `pubspec.yaml`, `.gradle` with a parent Gradle settings/build file, SwiftPM `.build` with `Package.swift`, CocoaPods `Pods` with `Podfile` or `Podfile.lock`, and Python `.pytest_cache`/`.mypy_cache` with a recognized project or tool marker in the parent. These patterns identify candidates, not proof that content is disposable. Show the marker and directory modification time; that time is not last use. Limit results to 200 and report overflow in skipped items. Preserve user data and never run tool commands or delete files automatically.
 
 Sizes sum logical file lengths observed during traversal. They may be partial, can count hard links or nested candidates more than once, and do not measure physical storage or reclaimable bytes.
 

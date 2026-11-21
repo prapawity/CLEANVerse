@@ -20,6 +20,44 @@ class CapturingScanner implements FolderScanner {
 
 void main() {
   test(
+    'classifies developer folders only with a matching parent marker',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final scenarios = [
+        ('swift', 'Package.swift', '.build', 'Swift package build output'),
+        ('ios', 'Podfile.lock', 'Pods', 'CocoaPods dependencies'),
+        ('python', 'pyproject.toml', '.pytest_cache', 'Python tool cache'),
+        ('typing', 'mypy.ini', '.mypy_cache', 'Python tool cache'),
+        ('gradle', 'settings.gradle.kts', '.gradle', 'Gradle project cache'),
+      ];
+      for (final (name, marker, folder, _) in scenarios) {
+        final project = await Directory(pJoin(root.path, name)).create();
+        await File(pJoin(project.path, marker)).writeAsString('');
+        await Directory(pJoin(project.path, folder)).create();
+      }
+      final unrelated = await Directory(pJoin(root.path, 'unrelated')).create();
+      await Directory(pJoin(unrelated.path, '.build')).create();
+      await Directory(pJoin(unrelated.path, 'Pods')).create();
+      await Directory(pJoin(unrelated.path, '.pytest_cache')).create();
+      final result = await LocalFolderScanner().scan(
+        root.path,
+        () => false,
+        findDevFolders: true,
+      );
+      expect(result.devFolders, hasLength(scenarios.length));
+      for (final (name, marker, folder, category) in scenarios) {
+        final item = result.devFolders.singleWhere(
+          (item) => item.path == pJoin(pJoin(root.path, name), folder),
+        );
+        expect(item.category, category);
+        expect(item.projectMarker, pJoin(pJoin(root.path, name), marker));
+        expect(item.modified, isNotNull);
+      }
+    },
+  );
+
+  test(
     'developer folders require matching project markers and honor exclusions',
     () async {
       final root = await Directory.systemTemp.createTemp('cleanverse_test_');
