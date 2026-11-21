@@ -192,9 +192,7 @@ class _FolderScanCardState extends State<FolderScanCard> {
                       ),
                       SelectableText(folder.path),
                       if (folder.locationSource != null)
-                        Text(
-                          'Global cache candidate · ${folder.locationSource}',
-                        ),
+                        Text('Location source: ${folder.locationSource}'),
                       if (folder.projectMarker != null)
                         SelectableText(
                           'Project marker: ${folder.projectMarker}',

@@ -49,6 +49,7 @@ class DevFolder {
 List<DevFolder> globalCacheCandidates(
   Map<String, String> env, {
   required bool windows,
+  bool macos = false,
 }) {
   String? absolute(String? value) =>
       value != null && value.trim().isNotEmpty && p.isAbsolute(value)
@@ -59,6 +60,8 @@ List<DevFolder> globalCacheCandidates(
   final gradleOverride = absolute(env['GRADLE_USER_HOME']);
   final cargoOverride = absolute(env['CARGO_HOME']);
   final pubOverride = absolute(env['PUB_CACHE']);
+  final npmValue = env['npm_config_cache'] ?? env['NPM_CONFIG_CACHE'];
+  final npmOverride = absolute(npmValue);
   bool configured(String name) => (env[name]?.trim().isNotEmpty ?? false);
   final gradleHome = configured('GRADLE_USER_HOME')
       ? gradleOverride
@@ -73,6 +76,15 @@ List<DevFolder> globalCacheCandidates(
                   ? null
                   : p.join(localAppData, 'Pub', 'Cache'))
             : (home == null ? null : p.join(home, '.pub-cache')));
+  final npmConfigured = npmValue?.trim().isNotEmpty ?? false;
+  final npmHome = npmConfigured
+      ? npmOverride
+      : (windows
+            ? (localAppData == null ? null : p.join(localAppData, 'npm-cache'))
+            : (home == null ? null : p.join(home, '.npm')));
+  final xcodeHome = macos && home != null
+      ? p.join(home, 'Library', 'Developer', 'Xcode')
+      : null;
   return [
     if (gradleHome != null)
       DevFolder(
@@ -100,6 +112,31 @@ List<DevFolder> globalCacheCandidates(
         locationSource: pubOverride == null
             ? 'Default location; other tool configuration may override it'
             : 'PUB_CACHE environment variable',
+      ),
+    if (npmHome != null)
+      DevFolder(
+        p.join(npmHome, '_cacache'),
+        'npm content cache',
+        'This shared cache can support offline installs; packages may need to be downloaded again.',
+        locationSource: npmConfigured
+            ? 'npm_config_cache environment variable'
+            : 'Default location; other tool configuration may override it',
+      ),
+    if (xcodeHome != null)
+      DevFolder(
+        p.join(xcodeHome, 'DerivedData'),
+        'Xcode derived data',
+        'Build data may be recreated, but active builds can be disrupted and future builds may take longer.',
+        locationSource:
+            'Possible default location; Xcode settings may use another path',
+      ),
+    if (xcodeHome != null)
+      DevFolder(
+        p.join(xcodeHome, 'Archives'),
+        'Xcode archives',
+        'Archives can contain unique release builds and debug symbols. Do not assume they can be recreated.',
+        locationSource:
+            'Possible default location; Xcode settings may use another path',
       ),
   ];
 }
@@ -221,11 +258,16 @@ abstract interface class FolderScanner {
 }
 
 class LocalFolderScanner implements FolderScanner {
-  LocalFolderScanner({Map<String, String>? environment, bool? windows})
-    : environment = environment ?? Platform.environment,
-      windows = windows ?? Platform.isWindows;
+  LocalFolderScanner({
+    Map<String, String>? environment,
+    bool? windows,
+    bool? macos,
+  }) : environment = environment ?? Platform.environment,
+       windows = windows ?? Platform.isWindows,
+       macos = macos ?? Platform.isMacOS;
   final Map<String, String> environment;
   final bool windows;
+  final bool macos;
   @override
   Future<FolderScanResult> scan(
     String path,
@@ -257,7 +299,7 @@ class LocalFolderScanner implements FolderScanner {
     var candidateCount = 0;
     final devFolders = <DevFolder>[];
     final globalCaches = findDevFolders
-        ? globalCacheCandidates(environment, windows: windows)
+        ? globalCacheCandidates(environment, windows: windows, macos: macos)
         : <DevFolder>[];
     final folderBytes = <String, int>{};
     var skipped = 0;

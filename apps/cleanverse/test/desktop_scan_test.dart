@@ -20,6 +20,62 @@ class CapturingScanner implements FolderScanner {
 
 void main() {
   test(
+    'npm and Xcode locations remain scoped candidates with distinct risks',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final npmHome = await Directory(pJoin(root.path, 'custom-npm')).create();
+      final npmCache = await Directory(pJoin(npmHome.path, '_cacache'))
+          .create();
+      final xcode = await Directory(
+        pJoin(pJoin(pJoin(root.path, 'Library'), 'Developer'), 'Xcode'),
+      ).create(recursive: true);
+      final derived = await Directory(pJoin(xcode.path, 'DerivedData'))
+          .create();
+      final archives = await Directory(pJoin(xcode.path, 'Archives')).create();
+      final scanner = LocalFolderScanner(
+        environment: {'HOME': root.path, 'NPM_CONFIG_CACHE': npmHome.path},
+        windows: false,
+        macos: true,
+      );
+      final result = await scanner.scan(
+        root.path,
+        () => false,
+        findDevFolders: true,
+      );
+      final paths = {for (final item in result.devFolders) item.path: item};
+      expect(paths[npmCache.path]?.category, 'npm content cache');
+      expect(
+        paths[npmCache.path]?.locationSource,
+        'npm_config_cache environment variable',
+      );
+      expect(paths[derived.path]?.category, 'Xcode derived data');
+      expect(paths[archives.path]?.note, contains('unique release builds'));
+      final excluded = await scanner.scan(
+        root.path,
+        () => false,
+        findDevFolders: true,
+        exclusions: [xcode.path],
+      );
+      expect(
+        excluded.devFolders.any((item) => item.path == archives.path),
+        isFalse,
+      );
+    },
+  );
+
+  test('Xcode defaults are not proposed on non-macOS', () {
+    final env = {'HOME': Directory.systemTemp.path};
+    final nonMac = globalCacheCandidates(env, windows: false);
+    expect(nonMac.any((item) => item.category.startsWith('Xcode')), isFalse);
+    final mac = globalCacheCandidates(env, windows: false, macos: true);
+    expect(
+      mac.where((item) => item.category.startsWith('Xcode')),
+      hasLength(2),
+    );
+  });
+
+  test(
     'global cache candidates honor environment, scope and exclusions',
     () async {
       final root = await Directory.systemTemp.createTemp('cleanverse_test_');

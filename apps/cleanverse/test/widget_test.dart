@@ -148,9 +148,7 @@ void main() {
       findsNWidgets(2),
     );
     expect(
-      find.text(
-        'Global cache candidate · GRADLE_USER_HOME environment variable',
-      ),
+      find.text('Location source: GRADLE_USER_HOME environment variable'),
       findsOneWidget,
     );
     expect(
