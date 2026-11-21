@@ -1,6 +1,6 @@
 # CLEANVerse contributor instructions
 
-Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/SAFETY.md`, and `docs/ROADMAP.md` before implementing a feature. Consult `docs/RESEARCH.md` for sources and verify platform policies before release. These describe the intended product; the Python desktop prototype is the only current implementation.
+Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/SAFETY.md`, and `docs/ROADMAP.md` before implementing a feature. Consult `docs/RESEARCH.md` for sources and verify platform policies before release. These describe the intended product; the Python prototype and the Flutter read-only desktop scan are experimental implementations.
 
 - Scan read-only. Never auto-select personal content or silently fall back to permanent deletion. Require explicit confirmation before any future removal.
 - Platform and distribution capabilities differ. Disable unsupported operations and explain limitations.

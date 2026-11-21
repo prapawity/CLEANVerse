@@ -10,7 +10,7 @@ Create Flutter project with Windows, macOS, Linux, Android and iOS hosts; pin SD
 
 ## Phase 2 — read-only scan adapters
 
-Desktop: user-selected folders, exclusions, large files and exact duplicates, including cancellation, partial results and filesystem boundaries. Android: selected documents and permitted media. iOS: authorized photos and documents. Validate on named OS versions and devices. Set performance budgets after measuring representative devices.
+In progress: desktop folder selection and largest-file listing are implemented read-only, with cancellation and partial results. Further work must validate native picker builds, race-resistant scope confinement, exclusions, duplicates and macOS/Linux behavior. Android: selected documents and permitted media. iOS: authorized photos and documents. Validate on named OS versions and devices. Set performance budgets after measuring representative devices.
 
 ## Phase 3 — review and recoverable removal
 

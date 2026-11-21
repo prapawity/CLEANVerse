@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import 'demo_scan.dart';
+import 'folder_scan_card.dart';
 
 class CleanVerseApp extends StatelessWidget {
   const CleanVerseApp({super.key, required this.repository});
@@ -67,6 +68,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Understand your storage, one thoughtful step at a time.',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
+                const SizedBox(height: 24),
+                const FolderScanCard(),
+                const SizedBox(height: 24),
+                const Divider(),
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -150,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'This is an early preview. Real scanning, file selection and removal are not available yet. Features will differ by operating system.',
+                  'Desktop folder scanning is read-only. Duplicate detection, mobile scanning and file removal are not available yet.',
                 ),
               ],
             ),

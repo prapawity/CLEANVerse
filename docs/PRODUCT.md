@@ -1,6 +1,6 @@
 # Product definition
 
-Status: research and architecture baseline, 2026-11-21. The Python desktop app is an early prototype; Flutter and mobile apps are not implemented.
+Status: 2026-11-21. The Python desktop app and Flutter read-only desktop scan are early prototypes. Mobile scanning and Flutter removal are not implemented.
 
 ## Purpose
 
