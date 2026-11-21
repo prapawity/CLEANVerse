@@ -12,6 +12,7 @@ class CapturingScanner implements FolderScanner {
     List<String> exclusions = const [],
     bool findDuplicates = false,
     bool findDevFolders = false,
+    void Function(ScanProgress)? onProgress,
   }) async {
     received = exclusions;
     return const FolderScanResult([], 0, false);
@@ -19,6 +20,29 @@ class CapturingScanner implements FolderScanner {
 }
 
 void main() {
+  test('progress reports actual discovery and matching counts', () async {
+    final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+    addTearDown(() => root.delete(recursive: true));
+    await File(pJoin(root.path, 'a')).writeAsString('same');
+    await File(pJoin(root.path, 'b')).writeAsString('same');
+    await File(pJoin(root.path, 'c')).writeAsString('different length');
+    final events = <ScanProgress>[];
+    await LocalFolderScanner().scan(
+      root.path,
+      () => false,
+      findDuplicates: true,
+      onProgress: events.add,
+    );
+    expect(events.first.phase, ScanPhase.discovering);
+    final compare = events
+        .where((item) => item.phase == ScanPhase.comparing)
+        .toList();
+    expect(compare.first.filesSeen, 3);
+    expect(compare.first.toCompare, 2);
+    expect(compare.first.compared, 0);
+    expect(compare.last.compared, 2);
+  });
+
   test(
     'npm and Xcode locations remain scoped candidates with distinct risks',
     () async {

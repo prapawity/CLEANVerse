@@ -2,6 +2,9 @@ import 'package:cleanverse/src/app.dart';
 import 'package:cleanverse/src/demo_scan.dart';
 import 'package:cleanverse/src/desktop_scan.dart';
 import 'package:cleanverse/src/folder_scan_card.dart';
+
+import 'dart:async';
+
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +17,7 @@ class FakeFolderScanner implements FolderScanner {
     List<String> exclusions = const [],
     bool findDuplicates = false,
     bool findDevFolders = false,
+    void Function(ScanProgress)? onProgress,
   }) async => FolderScanResult(
     const [LargeFile('chosen/example.txt', 2048)],
     1,
@@ -42,7 +46,50 @@ class FakeFolderScanner implements FolderScanner {
   );
 }
 
+class PendingFolderScanner implements FolderScanner {
+  final completion = Completer<FolderScanResult>();
+  @override
+  Future<FolderScanResult> scan(
+    String path,
+    bool Function() cancelled, {
+    List<String> exclusions = const [],
+    bool findDuplicates = false,
+    bool findDevFolders = false,
+    void Function(ScanProgress)? onProgress,
+  }) {
+    onProgress?.call(const ScanProgress(ScanPhase.comparing, 20, 2, 4));
+    return completion.future;
+  }
+}
+
 void main() {
+  testWidgets('shows real matching progress and cancellation state', (
+    tester,
+  ) async {
+    final scanner = PendingFolderScanner();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: FolderScanCard(
+              scanner: scanner,
+              pickFolder: () async => 'chosen',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Choose and scan folder'));
+    await tester.pump();
+    expect(find.text('Comparing files: 2 of 4 checked.'), findsOneWidget);
+    await tester.tap(find.text('Cancel scan'));
+    await tester.pump();
+    expect(find.text('Stopping the scan…'), findsOneWidget);
+    scanner.completion.complete(const FolderScanResult([], 0, true));
+    await tester.pumpAndSettle();
+    expect(find.text('Scan cancelled. Results are partial.'), findsOneWidget);
+  });
+
   testWidgets('narrow screen supports enlarged text without overflow', (
     tester,
   ) async {
@@ -138,6 +185,8 @@ void main() {
     await tester.tap(find.text('Choose and scan folder'));
     await tester.pumpAndSettle();
     expect(find.text('Developer folders: 2'), findsOneWidget);
+    expect(find.text('Project folders'), findsOneWidget);
+    expect(find.text('Tool storage candidates'), findsOneWidget);
     expect(find.textContaining('Node.js dependencies'), findsOneWidget);
     expect(
       find.text('Project marker: chosen/project/package.json'),

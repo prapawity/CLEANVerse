@@ -247,6 +247,17 @@ class _DigestSink implements Sink<Digest> {
   void close() {}
 }
 
+enum ScanPhase { discovering, comparing }
+
+@immutable
+class ScanProgress {
+  const ScanProgress(this.phase, this.filesSeen, this.compared, this.toCompare);
+  final ScanPhase phase;
+  final int filesSeen;
+  final int compared;
+  final int toCompare;
+}
+
 abstract interface class FolderScanner {
   Future<FolderScanResult> scan(
     String path,
@@ -254,6 +265,7 @@ abstract interface class FolderScanner {
     List<String> exclusions = const [],
     bool findDuplicates = false,
     bool findDevFolders = false,
+    void Function(ScanProgress)? onProgress,
   });
 }
 
@@ -275,6 +287,7 @@ class LocalFolderScanner implements FolderScanner {
     List<String> exclusions = const [],
     bool findDuplicates = false,
     bool findDevFolders = false,
+    void Function(ScanProgress)? onProgress,
   }) async {
     final excluded = exclusions
         .map((path) => p.normalize(p.absolute(path)))
@@ -303,6 +316,8 @@ class LocalFolderScanner implements FolderScanner {
         : <DevFolder>[];
     final folderBytes = <String, int>{};
     var skipped = 0;
+    var filesSeen = 0;
+    onProgress?.call(const ScanProgress(ScanPhase.discovering, 0, 0, 0));
     Future<void> recordDevFolder(
       DevFolder candidate,
       FileSystemEntity entity,
@@ -371,6 +386,12 @@ class LocalFolderScanner implements FolderScanner {
             } else if (type == FileSystemEntityType.file) {
               final stat = await entity.stat();
               if (stat.type == FileSystemEntityType.file) {
+                filesSeen++;
+                if (filesSeen % 128 == 0) {
+                  onProgress?.call(
+                    ScanProgress(ScanPhase.discovering, filesSeen, 0, 0),
+                  );
+                }
                 if (findDevFolders) {
                   for (final folder in devFolders) {
                     if (p.isWithin(folder.path, entity.path)) {
@@ -411,6 +432,13 @@ class LocalFolderScanner implements FolderScanner {
     files.sort((a, b) => b.bytes.compareTo(a.bytes));
     final matches = <String, List<LargeFile>>{};
     if (findDuplicates && !cancelled()) {
+      final toCompare = candidates.values
+          .where((group) => group.length > 1)
+          .fold<int>(0, (total, group) => total + group.length);
+      var compared = 0;
+      onProgress?.call(
+        ScanProgress(ScanPhase.comparing, filesSeen, 0, toCompare),
+      );
       for (final group in candidates.values.where(
         (group) => group.length > 1,
       )) {
@@ -456,6 +484,18 @@ class LocalFolderScanner implements FolderScanner {
                 .add(LargeFile(candidate.path, candidate.size));
           } on FileSystemException {
             skipped++;
+          } finally {
+            if (!cancelled()) compared++;
+            if (!cancelled() && (compared % 16 == 0 || compared == toCompare)) {
+              onProgress?.call(
+                ScanProgress(
+                  ScanPhase.comparing,
+                  filesSeen,
+                  compared,
+                  toCompare,
+                ),
+              );
+            }
           }
         }
         if (cancelled()) break;
@@ -498,6 +538,8 @@ class FolderScanViewModel extends ChangeNotifier {
   String? root;
   String? error;
   FolderScanResult? result;
+  ScanProgress? progress;
+  bool get cancelling => _cancelled;
   bool findDuplicates = false;
   bool findDevFolders = false;
   final List<String> _exclusions = [];
@@ -534,6 +576,7 @@ class FolderScanViewModel extends ChangeNotifier {
     _exclusions.remove(path);
     result = null;
     root = null;
+    progress = null;
     notifyListeners();
   }
 
@@ -544,6 +587,7 @@ class FolderScanViewModel extends ChangeNotifier {
     error = null;
     result = null;
     root = null;
+    progress = null;
     notifyListeners();
     try {
       final selected = await pickFolder();
@@ -556,12 +600,19 @@ class FolderScanViewModel extends ChangeNotifier {
         exclusions: List.unmodifiable(_exclusions),
         findDuplicates: findDuplicates,
         findDevFolders: findDevFolders,
+        onProgress: (value) {
+          if (!_disposed && !_cancelled) {
+            progress = value;
+            notifyListeners();
+          }
+        },
       );
     } catch (_) {
       error = 'Unable to scan this folder. Check access and try again.';
     } finally {
       if (!_disposed) {
         busy = false;
+        progress = null;
         notifyListeners();
       }
     }

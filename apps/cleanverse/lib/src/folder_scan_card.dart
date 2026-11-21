@@ -76,8 +76,8 @@ class _FolderScanCardState extends State<FolderScanCard> {
         ),
         if (model.busy && !model.pickingExclusion)
           OutlinedButton(
-            onPressed: model.cancel,
-            child: const Text('Cancel scan'),
+            onPressed: model.cancelling ? null : model.cancel,
+            child: Text(model.cancelling ? 'Cancelling…' : 'Cancel scan'),
           )
         else if (!model.busy)
           FilledButton.icon(
@@ -106,14 +106,27 @@ class _FolderScanCardState extends State<FolderScanCard> {
             ),
         ],
         if (model.busy)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Scanning selected folder…'),
-                SizedBox(height: 8),
-                LinearProgressIndicator(),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    model.pickingExclusion
+                        ? 'Choose a folder to exclude.'
+                        : model.root == null
+                        ? 'Choose a folder to scan.'
+                        : model.cancelling
+                        ? 'Stopping the scan…'
+                        : model.progress?.phase == ScanPhase.comparing
+                        ? 'Comparing files: ${model.progress!.compared} of ${model.progress!.toCompare} checked.'
+                        : 'Scanning: ${model.progress?.filesSeen ?? 0} files found so far.',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(),
               ],
             ),
           ),
@@ -179,36 +192,30 @@ class _FolderScanCardState extends State<FolderScanCard> {
             const Text(
               'Candidates use project markers or possible cache locations. Sizes are logical bytes scanned, may be incomplete and are not reclaimable-space estimates. Up to 200 are shown.',
             ),
-            for (final folder in result.devFolders)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${folder.category} · ${formatBytes(folder.logicalBytes)} scanned',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      SelectableText(folder.path),
-                      if (folder.locationSource != null)
-                        Text('Location source: ${folder.locationSource}'),
-                      if (folder.projectMarker != null)
-                        SelectableText(
-                          'Project marker: ${folder.projectMarker}',
-                        ),
-                      if (folder.modified != null)
-                        Text(
-                          'Folder modified: ${folder.modified!.toLocal().toString().split('.').first} (not last used)',
-                        ),
-                      const Text(
-                        'Review required · Ownership and active use not verified',
-                      ),
-                      Text(folder.note),
-                    ],
-                  ),
+            if (result.devFolders.any((folder) => folder.projectMarker != null))
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text(
+                  'Project folders',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
+            for (final folder in result.devFolders.where(
+              (folder) => folder.projectMarker != null,
+            ))
+              _developerFolderCard(folder),
+            if (result.devFolders.any((folder) => folder.projectMarker == null))
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text(
+                  'Tool storage candidates',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            for (final folder in result.devFolders.where(
+              (folder) => folder.projectMarker == null,
+            ))
+              _developerFolderCard(folder),
           ],
           for (final file in result.files)
             Card(
@@ -222,6 +229,32 @@ class _FolderScanCardState extends State<FolderScanCard> {
     ),
   );
 }
+
+Widget _developerFolderCard(DevFolder folder) => Card(
+  child: Padding(
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${folder.category} · ${formatBytes(folder.logicalBytes)} scanned',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        SelectableText(folder.path),
+        if (folder.locationSource != null)
+          Text('Location source: ${folder.locationSource}'),
+        if (folder.projectMarker != null)
+          SelectableText('Project marker: ${folder.projectMarker}'),
+        if (folder.modified != null)
+          Text(
+            'Folder modified: ${folder.modified!.toLocal().toString().split('.').first} (not last used)',
+          ),
+        const Text('Review required · Ownership and active use not verified'),
+        Text(folder.note),
+      ],
+    ),
+  ),
+);
 
 String formatBytes(int bytes) {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
