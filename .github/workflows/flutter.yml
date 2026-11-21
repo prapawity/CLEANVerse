@@ -22,3 +22,10 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - run: flutter build windows
+      - name: Upload experimental Windows preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: CLEANVerse-Windows-preview-${{ github.sha }}
+          path: apps/cleanverse/build/windows/x64/runner/Release/
+          if-no-files-found: error
+          retention-days: 14

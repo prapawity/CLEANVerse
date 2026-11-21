@@ -11,4 +11,8 @@ flutter analyze
 flutter test
 ```
 
+## Windows preview from GitHub Actions
+
+Successful Windows CI runs upload an experimental, unsigned `CLEANVerse-Windows-preview-<commit>` artifact, retained for 14 days. Open the repository's Actions tab, select a successful **Flutter checks** run for the desired commit, and download its artifact. Extract the entire ZIP and run `cleanverse.exe` from the extracted folder; keep the accompanying DLLs and `data` folder next to it. GitHub may require signing in to download artifacts. This is a development preview, not a signed installer or production release.
+
 An optional developer-folder scan identifies some project dependency and build directories and reports observed logical sizes, which are not reclaimable-space estimates. It does not delete them. See `../../docs/DEVELOPER_STORAGE.md` for criteria and limitations. Platform-specific builds require the relevant Flutter toolchain. On Windows, Flutter plugins require symlink support (typically Windows Developer Mode). Apple builds require macOS and Xcode; Android requires the Android SDK. Exclusions match normalized paths and do not detect all aliases or hard links. Scanning skips links where identified but cannot guarantee scope confinement if a directory is replaced during a scan; use only trusted, stable folders. macOS and Linux scanning and native picker behavior remain unverified. See `../../docs/` for scope, safety, research and next steps.
