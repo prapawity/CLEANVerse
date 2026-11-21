@@ -135,6 +135,15 @@ class _FolderScanCardState extends State<FolderScanCard> {
             padding: const EdgeInsets.only(top: 12),
             child: SelectableText('Folder: ${model.root}'),
           ),
+        if (model.canGoBack)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: model.goBack,
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Back to previous folder'),
+            ),
+          ),
         if (model.error != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -196,6 +205,14 @@ class _FolderScanCardState extends State<FolderScanCard> {
                       Text(
                         '${formatBytes(summary.bytes)} · ${summary.fileCount} ${summary.fileCount == 1 ? 'file' : 'files'} scanned',
                       ),
+                      if (summary.folderPath != null)
+                        TextButton.icon(
+                          onPressed: model.busy
+                              ? null
+                              : () => model.openFolder(summary.folderPath!),
+                          icon: const Icon(Icons.folder_open_outlined),
+                          label: const Text('Explore folder'),
+                        ),
                     ],
                   ),
                 ),

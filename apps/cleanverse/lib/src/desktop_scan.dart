@@ -21,10 +21,16 @@ class StorageCategory {
 
 @immutable
 class FolderSummary {
-  const FolderSummary(this.label, this.bytes, this.fileCount);
+  const FolderSummary(
+    this.label,
+    this.bytes,
+    this.fileCount, {
+    this.folderPath,
+  });
   final String label;
   final int bytes;
   final int fileCount;
+  final String? folderPath;
 }
 
 String categoryForPath(String path) {
@@ -683,7 +689,12 @@ class LocalFolderScanner implements FolderScanner {
       folderSummaries: List.unmodifiable(
         ([
           for (final entry in topFolderBytes.entries)
-            FolderSummary(entry.key, entry.value, topFolderCounts[entry.key]!),
+            FolderSummary(
+              entry.key,
+              entry.value,
+              topFolderCounts[entry.key]!,
+              folderPath: entry.key,
+            ),
           if (rootCount > 0)
             FolderSummary(
               'Files directly in selected folder',
@@ -717,6 +728,8 @@ class FolderScanViewModel extends ChangeNotifier {
   bool get cancelling => _cancelled;
   bool findDuplicates = false;
   bool findDevFolders = false;
+  final List<String> _navigationHistory = [];
+  bool get canGoBack => _navigationHistory.isNotEmpty && !busy;
   final List<String> _exclusions = [];
   List<String> get exclusions => List.unmodifiable(_exclusions);
 
@@ -734,6 +747,7 @@ class FolderScanViewModel extends ChangeNotifier {
         _exclusions.add(normalized);
         result = null;
         root = null;
+        _navigationHistory.clear();
       }
     } catch (_) {
       error = 'Unable to select a folder. Try again.';
@@ -752,6 +766,7 @@ class FolderScanViewModel extends ChangeNotifier {
     result = null;
     root = null;
     progress = null;
+    _navigationHistory.clear();
     notifyListeners();
   }
 
@@ -763,27 +778,80 @@ class FolderScanViewModel extends ChangeNotifier {
     result = null;
     root = null;
     progress = null;
+    _navigationHistory.clear();
     notifyListeners();
     try {
       final selected = await pickFolder();
       if (_disposed || _cancelled || selected == null) return;
       root = selected;
       notifyListeners();
-      result = await scanner.scan(
-        selected,
-        () => _cancelled || _disposed,
-        exclusions: List.unmodifiable(_exclusions),
-        findDuplicates: findDuplicates,
-        findDevFolders: findDevFolders,
-        onProgress: (value) {
-          if (!_disposed && !_cancelled) {
-            progress = value;
-            notifyListeners();
-          }
-        },
-      );
+      await _scanRoot(selected);
     } catch (_) {
       error = 'Unable to scan this folder. Check access and try again.';
+    } finally {
+      if (!_disposed) {
+        busy = false;
+        progress = null;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> _scanRoot(String selected) async {
+    final scanned = await scanner.scan(
+      selected,
+      () => _cancelled || _disposed,
+      exclusions: List.unmodifiable(_exclusions),
+      findDuplicates: findDuplicates,
+      findDevFolders: findDevFolders,
+      onProgress: (value) {
+        if (!_disposed && !_cancelled) {
+          progress = value;
+          notifyListeners();
+        }
+      },
+    );
+    if (!_disposed) result = scanned;
+  }
+
+  Future<void> openFolder(String selected) async {
+    if (busy || root == null || result == null) return;
+    final currentRoot = root!;
+    final valid = result!.folderSummaries.any(
+      (entry) =>
+          entry.folderPath != null && p.equals(entry.folderPath!, selected),
+    );
+    if (!valid ||
+        !p.isWithin(
+          p.normalize(p.absolute(currentRoot)),
+          p.normalize(p.absolute(selected)),
+        )) {
+      return;
+    }
+    _navigationHistory.add(currentRoot);
+    await _navigateTo(selected);
+  }
+
+  Future<void> goBack() async {
+    if (!canGoBack) return;
+    final parent = _navigationHistory.removeLast();
+    await _navigateTo(parent);
+  }
+
+  Future<void> _navigateTo(String selected) async {
+    busy = true;
+    _cancelled = false;
+    error = null;
+    result = null;
+    progress = null;
+    root = selected;
+    notifyListeners();
+    try {
+      await _scanRoot(selected);
+    } catch (_) {
+      if (!_disposed) {
+        error = 'Unable to scan this folder. Check access and try again.';
+      }
     } finally {
       if (!_disposed) {
         busy = false;
@@ -803,6 +871,7 @@ class FolderScanViewModel extends ChangeNotifier {
     findDuplicates = value;
     result = null;
     root = null;
+    _navigationHistory.clear();
     notifyListeners();
   }
 
@@ -811,6 +880,7 @@ class FolderScanViewModel extends ChangeNotifier {
     findDevFolders = value;
     result = null;
     root = null;
+    _navigationHistory.clear();
     notifyListeners();
   }
 
