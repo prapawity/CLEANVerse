@@ -184,6 +184,8 @@ List<DevFolder> globalCacheCandidates(
   final pubOverride = absolute(env['PUB_CACHE']);
   final npmValue = env['npm_config_cache'] ?? env['NPM_CONFIG_CACHE'];
   final npmOverride = absolute(npmValue);
+  final pipOverride = absolute(env['PIP_CACHE_DIR']);
+  final moduleOverride = absolute(env['GOMODCACHE']);
   bool configured(String name) => (env[name]?.trim().isNotEmpty ?? false);
   final gradleHome = configured('GRADLE_USER_HOME')
       ? gradleOverride
@@ -207,6 +209,24 @@ List<DevFolder> globalCacheCandidates(
   final xcodeHome = macos && home != null
       ? p.join(home, 'Library', 'Developer', 'Xcode')
       : null;
+  final xdgConfigured = configured('XDG_CACHE_HOME');
+  final xdgCache = absolute(env['XDG_CACHE_HOME']);
+  final pipHome = configured('PIP_CACHE_DIR')
+      ? pipOverride
+      : windows
+      ? (localAppData == null ? null : p.join(localAppData, 'pip', 'Cache'))
+      : xdgConfigured
+      ? (xdgCache == null ? null : p.join(xdgCache, 'pip'))
+      : macos
+      ? (home == null ? null : p.join(home, 'Library', 'Caches', 'pip'))
+      : (home == null ? null : p.join(home, '.cache', 'pip'));
+  final pathList = env['GOPATH'];
+  final firstGoPath = configured('GOPATH')
+      ? absolute(pathList!.split(windows ? ';' : ':').first)
+      : (home == null ? null : p.join(home, 'go'));
+  final moduleCache = configured('GOMODCACHE')
+      ? moduleOverride
+      : (firstGoPath == null ? null : p.join(firstGoPath, 'pkg', 'mod'));
   return [
     if (gradleHome != null)
       DevFolder(
@@ -243,6 +263,28 @@ List<DevFolder> globalCacheCandidates(
         locationSource: npmConfigured
             ? 'npm_config_cache environment variable'
             : 'Default location; other tool configuration may override it',
+      ),
+    if (pipHome != null)
+      DevFolder(
+        pipHome,
+        'Python pip package cache',
+        'Packages may need to be downloaded again; cached content may be shared.',
+        locationSource: configured('PIP_CACHE_DIR')
+            ? 'PIP_CACHE_DIR environment variable'
+            : xdgConfigured && !windows
+            ? 'XDG_CACHE_HOME candidate; pip version and configuration may differ'
+            : 'Default location; other tool configuration may override it',
+      ),
+    if (moduleCache != null)
+      DevFolder(
+        moduleCache,
+        'Go module cache',
+        'Modules may be shared by projects and required for offline builds; contents can include private code.',
+        locationSource: configured('GOMODCACHE')
+            ? 'GOMODCACHE environment variable'
+            : configured('GOPATH')
+            ? 'First GOPATH entry; Go configuration may override it'
+            : 'Default location; Go configuration may override it',
       ),
     if (xcodeHome != null)
       DevFolder(
