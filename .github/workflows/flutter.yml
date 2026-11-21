@@ -6,6 +6,7 @@ on:
 
 jobs:
   test:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[preview-only]')
     runs-on: windows-latest
     defaults:
       run:
@@ -26,6 +27,29 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CLEANVerse-Windows-preview-${{ github.sha }}
+          path: apps/cleanverse/build/windows/x64/runner/Release/
+          if-no-files-found: error
+          retention-days: 14
+
+  preview:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[preview-only]')
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/cleanverse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.1'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows
+      - name: Upload untested Windows preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: CLEANVerse-Windows-untested-${{ github.sha }}
           path: apps/cleanverse/build/windows/x64/runner/Release/
           if-no-files-found: error
           retention-days: 14
