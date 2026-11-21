@@ -2,6 +2,10 @@
 
 Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/SAFETY.md`, and `docs/ROADMAP.md` before implementing a feature. Consult `docs/RESEARCH.md` for sources and verify platform policies before release. These describe the intended product; the Python prototype and the Flutter read-only desktop scan are experimental implementations.
 
+## Design, UI/UX, and frontend review
+
+For every change, assess whether it affects the user experience, interface, or product design. Apply the `design`, `ui-ux-pro-max`, and `frontend-design` skills when available, following the workflow in `docs/DESIGN_REVIEW.md`. For non-visual changes, check user-facing consequences and document why a visual review is not applicable. If a named skill is unavailable, use the documented checklist and report the limitation; do not claim the skill was run. User instructions and safety requirements take precedence.
+
 - Scan read-only. Never auto-select personal content or silently fall back to permanent deletion. Require explicit confirmation before any future removal.
 - Platform and distribution capabilities differ. Disable unsupported operations and explain limitations.
 - Treat paths, names, hashes, and scan results as sensitive. Keep them local by default. No telemetry or uploads without a documented, explicit opt-in.
