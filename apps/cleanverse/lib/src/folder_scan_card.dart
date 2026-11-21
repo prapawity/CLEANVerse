@@ -50,7 +50,7 @@ class _FolderScanCardState extends State<FolderScanCard> {
             child: const Text('Cancel scan'),
           )
         else if (!model.busy)
-          FilledButton.tonalIcon(
+          FilledButton.icon(
             onPressed: supported ? model.start : null,
             icon: const Icon(Icons.folder_open),
             label: const Text('Choose and scan folder'),

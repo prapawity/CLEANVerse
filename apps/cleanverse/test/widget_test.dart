@@ -17,6 +17,20 @@ class FakeFolderScanner implements FolderScanner {
 }
 
 void main() {
+  testWidgets('narrow screen supports enlarged text without overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(CleanVerseApp(repository: DemoScanRepository()));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('preview explains its scope and shows examples', (tester) async {
     await tester.pumpWidget(CleanVerseApp(repository: DemoScanRepository()));
     expect(find.textContaining('example data only'), findsOneWidget);

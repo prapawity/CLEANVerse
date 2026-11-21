@@ -15,8 +15,14 @@ class CleanVerseApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff215e83)),
-      scaffoldBackgroundColor: const Color(0xfff3f7f8),
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xff4cc2ff),
+        brightness: Brightness.dark,
+        primary: const Color(0xff4cc2ff),
+        surface: const Color(0xff181825),
+      ),
+      scaffoldBackgroundColor: const Color(0xff1e1e2e),
     ),
     home: HomeScreen(repository: repository),
   );
@@ -40,9 +46,48 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text(
-        'CLEANVerse',
-        style: TextStyle(fontWeight: FontWeight.w800),
+      title: const Row(
+        children: [
+          ExcludeSemantics(
+            child: Image(
+              image: AssetImage('assets/brand/planet.png'),
+              width: 48,
+              height: 48,
+            ),
+          ),
+          SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'CLEAN',
+                      style: TextStyle(
+                        color: Color(0xff4cc2ff),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Verse',
+                      style: TextStyle(
+                        color: Color(0xffcba6f7),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                style: TextStyle(fontSize: 20),
+              ),
+              Text(
+                'by PRAPAWITY',
+                style: TextStyle(fontSize: 10, color: Color(0xffbac2de)),
+              ),
+            ],
+          ),
+        ],
       ),
       backgroundColor: Colors.transparent,
     ),
@@ -56,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
               children: [
                 const Text(
-                  'A little more room to breathe.',
+                  'Your space, in perspective.',
                   style: TextStyle(
                     fontSize: 32,
                     height: 1.12,
@@ -65,19 +110,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Understand your storage, one thoughtful step at a time.',
+                  'Explore your files with clarity and control.',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 24),
-                const FolderScanCard(),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xff181825),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xff45475a)),
+                  ),
+                  child: const FolderScanCard(),
+                ),
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: const Color(0xffdceef1),
-                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xff181825),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xff45475a)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Icon(
                         Icons.auto_awesome_outlined,
                         size: 32,
-                        color: Color(0xff215e83),
+                        color: Color(0xffcba6f7),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -106,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: const Text('Cancel preview'),
                         )
                       else
-                        FilledButton.icon(
+                        OutlinedButton.icon(
                           onPressed: model.start,
                           icon: const Icon(Icons.play_arrow_rounded),
                           label: Text(

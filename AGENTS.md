@@ -6,6 +6,8 @@ Read `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/SAFETY.md`, and `docs/ROAD
 
 For every change, assess whether it affects the user experience, interface, or product design. Apply the `design`, `ui-ux-pro-max`, and `frontend-design` skills when available, following the workflow in `docs/DESIGN_REVIEW.md`. For non-visual changes, check user-facing consequences and document why a visual review is not applicable. If a named skill is unavailable, use the documented checklist and report the limitation; do not claim the skill was run. User instructions and safety requirements take precedence.
 
+Read `docs/VISUAL_DIRECTION.md` for the current GITVerse-inspired identity and CleanMyMac interaction research before visual changes.
+
 - Scan read-only. Never auto-select personal content or silently fall back to permanent deletion. Require explicit confirmation before any future removal.
 - Platform and distribution capabilities differ. Disable unsupported operations and explain limitations.
 - Treat paths, names, hashes, and scan results as sensitive. Keep them local by default. No telemetry or uploads without a documented, explicit opt-in.

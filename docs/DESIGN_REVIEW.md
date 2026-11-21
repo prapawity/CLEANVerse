@@ -20,4 +20,4 @@ Apply this review to each change, proportionate to its impact. The owner has req
 
 ## Current state
 
-The initial Flutter screen is an early functional prototype, not an approved visual identity. Its desktop preview contains an example scan and a separate read-only folder scan. Mobile support and broader accessibility validation remain unverified. Define and review a visual direction before undertaking a full redesign.
+The Flutter screen is an early functional prototype using the initial direction in `VISUAL_DIRECTION.md`. Its desktop preview contains an example scan and a separate read-only folder scan. Mobile support, screen-reader use, native platform behavior, and broader accessibility validation remain unverified.
