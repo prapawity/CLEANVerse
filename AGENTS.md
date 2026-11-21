@@ -8,6 +8,8 @@ For every change, assess whether it affects the user experience, interface, or p
 
 Read `docs/VISUAL_DIRECTION.md` for the current GITVerse-inspired identity and CleanMyMac interaction research before visual changes.
 
+Read `docs/DEVELOPER_REQUIREMENTS.md` and `docs/DEVELOPER_STORAGE.md` before changing developer storage discovery or cleanup.
+
 - Scan read-only. Never auto-select personal content or silently fall back to permanent deletion. Require explicit confirmation before any future removal.
 - Platform and distribution capabilities differ. Disable unsupported operations and explain limitations.
 - Treat paths, names, hashes, and scan results as sensitive. Keep them local by default. No telemetry or uploads without a documented, explicit opt-in.

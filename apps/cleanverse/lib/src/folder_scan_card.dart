@@ -44,6 +44,36 @@ class _FolderScanCardState extends State<FolderScanCard> {
               : 'Folder scanning is available on desktop. Mobile scanning is not available yet.',
         ),
         const SizedBox(height: 12),
+        Material(
+          color: Colors.transparent,
+          child: CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: model.findDuplicates,
+            onChanged: supported && !model.busy
+                ? (value) => model.setFindDuplicates(value ?? false)
+                : null,
+            title: const Text('Find matching files'),
+            subtitle: const Text(
+              'Compares SHA-256 hashes locally for up to 20,000 files. This can take longer.',
+            ),
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+        ),
+        Material(
+          color: Colors.transparent,
+          child: CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: model.findDevFolders,
+            onChanged: supported && !model.busy
+                ? (value) => model.setFindDevFolders(value ?? false)
+                : null,
+            title: const Text('Find developer folders'),
+            subtitle: const Text(
+              'Identify project dependencies and build folders inside the selected scope. No files are removed.',
+            ),
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+        ),
         if (model.busy && !model.pickingExclusion)
           OutlinedButton(
             onPressed: model.cancel,
@@ -78,7 +108,14 @@ class _FolderScanCardState extends State<FolderScanCard> {
         if (model.busy)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
-            child: LinearProgressIndicator(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Scanning selected folder…'),
+                SizedBox(height: 8),
+                LinearProgressIndicator(),
+              ],
+            ),
           ),
         if (model.root != null)
           Padding(
@@ -107,6 +144,59 @@ class _FolderScanCardState extends State<FolderScanCard> {
           ),
           if (result.files.isEmpty)
             const Text('No files found in the scanned scope.'),
+          if (model.findDuplicates) ...[
+            const SizedBox(height: 12),
+            Text('Matching groups: ${result.duplicates.length}'),
+            const Text(
+              'Matches have the same size and SHA-256 hash. Hard links may appear separately; no space savings are estimated.',
+            ),
+            const Text('Showing up to 50 groups and 20 paths per group.'),
+            for (final group in result.duplicates.take(50))
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${group.length} matching files · ${formatBytes(group.first.bytes)} each',
+                      ),
+                      for (final file in group.take(20))
+                        SelectableText(file.path),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 12),
+            const Text(
+              'Largest files',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+          if (model.findDevFolders) ...[
+            const SizedBox(height: 12),
+            Text('Developer folders: ${result.devFolders.length}'),
+            const Text(
+              'Candidates identified by folder and project marker. Sizes are logical bytes scanned, may be incomplete and are not reclaimable-space estimates. Up to 200 are shown.',
+            ),
+            for (final folder in result.devFolders)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${folder.category} · ${formatBytes(folder.logicalBytes)} scanned',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      SelectableText(folder.path),
+                      Text(folder.note),
+                    ],
+                  ),
+                ),
+              ),
+          ],
           for (final file in result.files)
             Card(
               child: ListTile(

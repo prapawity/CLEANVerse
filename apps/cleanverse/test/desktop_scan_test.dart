@@ -10,6 +10,8 @@ class CapturingScanner implements FolderScanner {
     String path,
     bool Function() cancelled, {
     List<String> exclusions = const [],
+    bool findDuplicates = false,
+    bool findDevFolders = false,
   }) async {
     received = exclusions;
     return const FolderScanResult([], 0, false);
@@ -17,6 +19,90 @@ class CapturingScanner implements FolderScanner {
 }
 
 void main() {
+  test(
+    'developer folders require matching project markers and honor exclusions',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final project = await Directory(pJoin(root.path, 'project')).create();
+      await File(pJoin(project.path, 'package.json')).writeAsString('{}');
+      final deps = await Directory(pJoin(project.path, 'node_modules'))
+          .create();
+      await File(pJoin(deps.path, 'cached')).writeAsBytes([1, 2, 3]);
+      final falsePositive = await Directory(pJoin(root.path, 'node_modules'))
+          .create();
+      final excluded = await Directory(pJoin(root.path, 'excluded')).create();
+      await File(pJoin(excluded.path, 'Cargo.toml')).writeAsString('');
+      await Directory(pJoin(excluded.path, 'target')).create();
+      final result = await LocalFolderScanner().scan(
+        root.path,
+        () => false,
+        findDevFolders: true,
+        exclusions: [excluded.path],
+      );
+      expect(result.devFolders.map((item) => item.path), [deps.path]);
+      expect(result.devFolders.single.logicalBytes, 3);
+      expect(
+        result.devFolders.any((item) => item.path == falsePositive.path),
+        isFalse,
+      );
+      expect(
+        (await LocalFolderScanner().scan(root.path, () => false)).devFolders,
+        isEmpty,
+      );
+    },
+  );
+  test(
+    'finds matching hashes across all scanned files and respects exclusions',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final excluded = await Directory(
+        '${root.path}${Platform.pathSeparator}excluded',
+      ).create();
+      for (final name in ['a', 'b']) {
+        await File('${root.path}${Platform.pathSeparator}$name')
+            .writeAsString('same');
+      }
+      await File('${root.path}${Platform.pathSeparator}different')
+          .writeAsString('else');
+      await File('${excluded.path}${Platform.pathSeparator}hidden')
+          .writeAsString('same');
+      final result = await LocalFolderScanner().scan(
+        root.path,
+        () => false,
+        exclusions: [excluded.path],
+        findDuplicates: true,
+      );
+      expect(result.duplicates, hasLength(1));
+      expect(
+        result.duplicates.single
+            .map((item) => item.path.split(Platform.pathSeparator).last)
+            .toSet(),
+        {'a', 'b'},
+      );
+    },
+  );
+
+  test('matching is opt-in and empty files match', () async {
+    final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+    addTearDown(() => root.delete(recursive: true));
+    await File('${root.path}${Platform.pathSeparator}a').writeAsBytes([]);
+    await File('${root.path}${Platform.pathSeparator}b').writeAsBytes([]);
+    expect(
+      (await LocalFolderScanner().scan(root.path, () => false)).duplicates,
+      isEmpty,
+    );
+    expect(
+      (await LocalFolderScanner().scan(
+        root.path,
+        () => false,
+        findDuplicates: true,
+      )).duplicates.single,
+      hasLength(2),
+    );
+  });
+
   test(
     'view model passes session exclusions and supports removing them',
     () async {
@@ -132,3 +218,5 @@ void main() {
     );
   });
 }
+
+String pJoin(String a, String b) => '$a${Platform.pathSeparator}$b';

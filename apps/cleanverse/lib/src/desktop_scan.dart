@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:path/path.dart' as p;
+import 'package:crypto/crypto.dart';
 
 class LargeFile {
   const LargeFile(this.path, this.bytes);
@@ -11,10 +12,85 @@ class LargeFile {
 }
 
 class FolderScanResult {
-  const FolderScanResult(this.files, this.skipped, this.cancelled);
+  const FolderScanResult(
+    this.files,
+    this.skipped,
+    this.cancelled, {
+    this.duplicates = const [],
+    this.devFolders = const [],
+  });
   final List<LargeFile> files;
   final int skipped;
   final bool cancelled;
+  final List<List<LargeFile>> duplicates;
+  final List<DevFolder> devFolders;
+}
+
+class DevFolder {
+  const DevFolder(this.path, this.category, this.note, {this.logicalBytes = 0});
+  final String path;
+  final String category;
+  final String note;
+  final int logicalBytes;
+}
+
+Future<DevFolder?> classifyDevFolder(String path) async {
+  final parent = p.dirname(path);
+  final name = p.basename(path);
+  Future<bool> hasMarker(String filename) async =>
+      await FileSystemEntity.type(
+        p.join(parent, filename),
+        followLinks: false,
+      ) ==
+      FileSystemEntityType.file;
+  if (name == 'node_modules' && await hasMarker('package.json')) {
+    return DevFolder(
+      path,
+      'Node.js dependencies',
+      'Reinstalling may require network access and can change the working environment.',
+    );
+  }
+  if (name == 'target' && await hasMarker('Cargo.toml')) {
+    return DevFolder(
+      path,
+      'Rust build output',
+      'Build output is recreated by future builds, which may take longer.',
+    );
+  }
+  if (name == '.dart_tool' && await hasMarker('pubspec.yaml')) {
+    return DevFolder(
+      path,
+      'Dart / Flutter project data',
+      'Tooling may need to resolve dependencies again.',
+    );
+  }
+  if (name == '.gradle' &&
+      (await hasMarker('settings.gradle') ||
+          await hasMarker('settings.gradle.kts') ||
+          await hasMarker('build.gradle') ||
+          await hasMarker('build.gradle.kts'))) {
+    return DevFolder(
+      path,
+      'Gradle project cache',
+      'Gradle may need to rebuild caches and download dependencies.',
+    );
+  }
+  return null;
+}
+
+class _Candidate {
+  const _Candidate(this.path, this.size, this.modified);
+  final String path;
+  final int size;
+  final DateTime modified;
+}
+
+class _DigestSink implements Sink<Digest> {
+  Digest? digest;
+  @override
+  void add(Digest value) => digest = value;
+  @override
+  void close() {}
 }
 
 abstract interface class FolderScanner {
@@ -22,6 +98,8 @@ abstract interface class FolderScanner {
     String path,
     bool Function() cancelled, {
     List<String> exclusions = const [],
+    bool findDuplicates = false,
+    bool findDevFolders = false,
   });
 }
 
@@ -31,6 +109,8 @@ class LocalFolderScanner implements FolderScanner {
     String path,
     bool Function() cancelled, {
     List<String> exclusions = const [],
+    bool findDuplicates = false,
+    bool findDevFolders = false,
   }) async {
     final excluded = exclusions
         .map((path) => p.normalize(p.absolute(path)))
@@ -51,6 +131,10 @@ class LocalFolderScanner implements FolderScanner {
     }
     final pending = <Directory>[root];
     final files = <LargeFile>[];
+    final candidates = <int, List<_Candidate>>{};
+    var candidateCount = 0;
+    final devFolders = <DevFolder>[];
+    final folderBytes = <String, int>{};
     var skipped = 0;
     while (pending.isNotEmpty && !cancelled()) {
       final directory = pending.removeLast();
@@ -70,10 +154,39 @@ class LocalFolderScanner implements FolderScanner {
               followLinks: false,
             );
             if (type == FileSystemEntityType.directory) {
+              if (findDevFolders) {
+                final detected = await classifyDevFolder(entity.path);
+                if (detected != null) {
+                  if (devFolders.length < 200) {
+                    devFolders.add(detected);
+                    folderBytes[detected.path] = 0;
+                  } else {
+                    skipped++;
+                  }
+                }
+              }
               pending.add(Directory(entity.path));
             } else if (type == FileSystemEntityType.file) {
               final stat = await entity.stat();
               if (stat.type == FileSystemEntityType.file) {
+                if (findDevFolders) {
+                  for (final folder in devFolders) {
+                    if (p.isWithin(folder.path, entity.path)) {
+                      folderBytes[folder.path] =
+                          folderBytes[folder.path]! + stat.size;
+                    }
+                  }
+                }
+                if (findDuplicates) {
+                  if (candidateCount < 20000) {
+                    candidates
+                        .putIfAbsent(stat.size, () => [])
+                        .add(_Candidate(entity.path, stat.size, stat.modified));
+                    candidateCount++;
+                  } else {
+                    skipped++;
+                  }
+                }
                 if (files.length < 100 || stat.size > files.last.bytes) {
                   files.add(LargeFile(entity.path, stat.size));
                   files.sort((a, b) => b.bytes.compareTo(a.bytes));
@@ -94,10 +207,77 @@ class LocalFolderScanner implements FolderScanner {
       }
     }
     files.sort((a, b) => b.bytes.compareTo(a.bytes));
+    final matches = <String, List<LargeFile>>{};
+    if (findDuplicates && !cancelled()) {
+      for (final group in candidates.values.where(
+        (group) => group.length > 1,
+      )) {
+        for (final candidate in group) {
+          if (cancelled()) break;
+          try {
+            if (await FileSystemEntity.type(
+                  candidate.path,
+                  followLinks: false,
+                ) !=
+                FileSystemEntityType.file) {
+              skipped++;
+              continue;
+            }
+            final before = await File(candidate.path).stat();
+            if (before.size != candidate.size ||
+                before.modified != candidate.modified) {
+              skipped++;
+              continue;
+            }
+            final output = _DigestSink();
+            final hash = sha256.startChunkedConversion(output);
+            await for (final bytes in File(candidate.path).openRead()) {
+              if (cancelled()) break;
+              hash.add(bytes);
+            }
+            hash.close();
+            if (cancelled()) break;
+            final afterType = await FileSystemEntity.type(
+              candidate.path,
+              followLinks: false,
+            );
+            final after = await File(candidate.path).stat();
+            if (afterType != FileSystemEntityType.file ||
+                after.size != candidate.size ||
+                after.modified != candidate.modified) {
+              skipped++;
+              continue;
+            }
+            final key = '${candidate.size}:${output.digest}';
+            matches
+                .putIfAbsent(key, () => [])
+                .add(LargeFile(candidate.path, candidate.size));
+          } on FileSystemException {
+            skipped++;
+          }
+        }
+        if (cancelled()) break;
+      }
+    }
     return FolderScanResult(
       List.unmodifiable(files.take(100)),
       skipped,
       cancelled(),
+      duplicates: List.unmodifiable(
+        matches.values
+            .where((group) => group.length > 1)
+            .map((group) => List<LargeFile>.unmodifiable(group)),
+      ),
+      devFolders: List.unmodifiable(
+        devFolders.map(
+          (folder) => DevFolder(
+            folder.path,
+            folder.category,
+            folder.note,
+            logicalBytes: folderBytes[folder.path]!,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -113,6 +293,8 @@ class FolderScanViewModel extends ChangeNotifier {
   String? root;
   String? error;
   FolderScanResult? result;
+  bool findDuplicates = false;
+  bool findDevFolders = false;
   final List<String> _exclusions = [];
   List<String> get exclusions => List.unmodifiable(_exclusions);
 
@@ -167,6 +349,8 @@ class FolderScanViewModel extends ChangeNotifier {
         selected,
         () => _cancelled || _disposed,
         exclusions: List.unmodifiable(_exclusions),
+        findDuplicates: findDuplicates,
+        findDevFolders: findDevFolders,
       );
     } catch (_) {
       error = 'Unable to scan this folder. Check access and try again.';
@@ -180,6 +364,22 @@ class FolderScanViewModel extends ChangeNotifier {
 
   void cancel() {
     _cancelled = true;
+    notifyListeners();
+  }
+
+  void setFindDuplicates(bool value) {
+    if (busy) return;
+    findDuplicates = value;
+    result = null;
+    root = null;
+    notifyListeners();
+  }
+
+  void setFindDevFolders(bool value) {
+    if (busy) return;
+    findDevFolders = value;
+    result = null;
+    root = null;
     notifyListeners();
   }
 

@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Desktop folder scanning is read-only. Duplicate detection, mobile scanning and file removal are not available yet.',
+                  'Desktop folder scanning and file matching are read-only. Mobile scanning and file removal are not available yet.',
                 ),
               ],
             ),
