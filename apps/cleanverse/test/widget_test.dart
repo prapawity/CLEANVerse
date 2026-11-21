@@ -22,6 +22,7 @@ class FakeFolderScanner implements FolderScanner {
     const [LargeFile('chosen/example.txt', 2048)],
     1,
     false,
+    storageCategories: const [StorageCategory('Documents', 2048, 1)],
     duplicates: findDuplicates
         ? const [
             [LargeFile('chosen/a.txt', 10), LargeFile('chosen/b.txt', 10)],
@@ -126,9 +127,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: FolderScanCard(
-            scanner: FakeFolderScanner(),
-            pickFolder: () async => 'chosen',
+          body: SingleChildScrollView(
+            child: FolderScanCard(
+              scanner: FakeFolderScanner(),
+              pickFolder: () async => 'chosen',
+            ),
           ),
         ),
       ),
@@ -138,6 +141,10 @@ void main() {
     expect(find.text('Folder: chosen'), findsOneWidget);
     expect(find.text('chosen/example.txt'), findsOneWidget);
     expect(find.textContaining('Results may be incomplete'), findsOneWidget);
+    expect(find.text('Storage by file type'), findsOneWidget);
+    expect(find.text('Documents: 2.0 KiB · 1 file'), findsOneWidget);
+    expect(find.bySemanticsLabel('Documents, 2.0 KiB, 1 file'), findsOneWidget);
+    expect(find.textContaining('This breakdown is partial'), findsOneWidget);
   });
 
   testWidgets('opt-in matching shows groups without removal controls', (

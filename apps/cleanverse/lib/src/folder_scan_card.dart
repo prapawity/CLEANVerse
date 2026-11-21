@@ -157,6 +157,21 @@ class _FolderScanCardState extends State<FolderScanCard> {
           ),
           if (result.files.isEmpty)
             const Text('No files found in the scanned scope.'),
+          if (result.storageCategories.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Text(
+              'Storage by file type',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const Text(
+              'Based on file extensions in this scan. Logical file sizes can include hard links and are not physical or reclaimable disk space.',
+            ),
+            if (result.cancelled || result.skipped > 0)
+              const Text(
+                'This breakdown is partial because the scan was cancelled or items were skipped.',
+              ),
+            _StorageBreakdown(categories: result.storageCategories),
+          ],
           if (model.findDuplicates) ...[
             const SizedBox(height: 12),
             Text('Matching groups: ${result.duplicates.length}'),
@@ -255,6 +270,50 @@ Widget _developerFolderCard(DevFolder folder) => Card(
     ),
   ),
 );
+
+class _StorageBreakdown extends StatelessWidget {
+  const _StorageBreakdown({required this.categories});
+  final List<StorageCategory> categories;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = categories.fold<int>(
+      0,
+      (sum, category) => sum + category.bytes,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text('Scanned logical size: ${formatBytes(total)}'),
+        ),
+        for (final category in categories)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${category.label}: ${formatBytes(category.bytes)} · ${category.fileCount} ${category.fileCount == 1 ? 'file' : 'files'}',
+                ),
+                const SizedBox(height: 4),
+                Semantics(
+                  label:
+                      '${category.label}, ${formatBytes(category.bytes)}, ${category.fileCount} ${category.fileCount == 1 ? 'file' : 'files'}',
+                  child: ExcludeSemantics(
+                    child: LinearProgressIndicator(
+                      value: total == 0 ? 0 : category.bytes / total,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
 
 String formatBytes(int bytes) {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];

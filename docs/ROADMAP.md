@@ -10,7 +10,7 @@ Create Flutter project with Windows, macOS, Linux, Android and iOS hosts; pin SD
 
 ## Phase 2 — read-only scan adapters
 
-In progress: desktop folder selection, session-only path exclusions, largest-file listing, optional size/SHA-256 matching, project artifact discovery and limited global cache candidates are implemented read-only, with cancellation and partial results. Matching has a 20,000-file cap and does not identify hard links. Further work must validate native picker builds, race-resistant scope confinement, cache configurations, exclusion aliases, file identity and macOS/Linux behavior. Android: selected documents and permitted media. iOS: authorized photos and documents. Validate on named OS versions and devices. Set performance budgets after measuring representative devices.
+In progress: desktop folder selection, session-only path exclusions, an extension-based storage breakdown, largest-file listing, optional size/SHA-256 matching, project artifact discovery and limited global cache candidates are implemented read-only, with cancellation and partial results. Matching has a 20,000-file cap and does not identify hard links. Further work must validate native picker builds, race-resistant scope confinement, cache configurations, exclusion aliases, file identity and macOS/Linux behavior. Android: selected documents and permitted media. iOS: authorized photos and documents. Validate on named OS versions and devices. Set performance budgets after measuring representative devices.
 
 ## Phase 3 — review and recoverable removal
 

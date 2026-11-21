@@ -20,6 +20,34 @@ class CapturingScanner implements FolderScanner {
 }
 
 void main() {
+  test(
+    'storage breakdown uses scanned logical sizes, types, and exclusions',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final excluded = await Directory(pJoin(root.path, 'excluded')).create();
+      await File(pJoin(root.path, 'photo.JPG')).writeAsBytes([1, 2, 3]);
+      await File(pJoin(root.path, 'notes.txt')).writeAsBytes([1, 2]);
+      await File(pJoin(root.path, 'unknown')).writeAsBytes([]);
+      await File(pJoin(excluded.path, 'hidden.png')).writeAsBytes([1, 2, 3, 4]);
+      final result = await LocalFolderScanner().scan(
+        root.path,
+        () => false,
+        exclusions: [excluded.path],
+      );
+      final categories = {
+        for (final category in result.storageCategories)
+          category.label: category,
+      };
+      expect(categories['Images']?.bytes, 3);
+      expect(categories['Images']?.fileCount, 1);
+      expect(categories['Documents']?.bytes, 2);
+      expect(categories['Other']?.bytes, 0);
+      expect(categories['Other']?.fileCount, 1);
+      expect(result.storageCategories.first.label, 'Images');
+    },
+  );
+
   test('progress reports actual discovery and matching counts', () async {
     final root = await Directory.systemTemp.createTemp('cleanverse_test_');
     addTearDown(() => root.delete(recursive: true));

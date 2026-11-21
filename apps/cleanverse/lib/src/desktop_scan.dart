@@ -11,6 +11,110 @@ class LargeFile {
   final int bytes;
 }
 
+@immutable
+class StorageCategory {
+  const StorageCategory(this.label, this.bytes, this.fileCount);
+  final String label;
+  final int bytes;
+  final int fileCount;
+}
+
+String categoryForPath(String path) {
+  final extension = p.extension(path).toLowerCase();
+  if (const {
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+    '.heic',
+    '.svg',
+    '.raw',
+    '.tif',
+    '.tiff',
+  }.contains(extension)) {
+    return 'Images';
+  }
+  if (const {
+    '.mp4',
+    '.mov',
+    '.mkv',
+    '.avi',
+    '.webm',
+    '.m4v',
+  }.contains(extension)) {
+    return 'Videos';
+  }
+  if (const {
+    '.mp3',
+    '.wav',
+    '.m4a',
+    '.flac',
+    '.ogg',
+    '.aac',
+  }.contains(extension)) {
+    return 'Audio';
+  }
+  if (const {
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.ppt',
+    '.pptx',
+    '.odt',
+    '.ods',
+    '.txt',
+    '.rtf',
+  }.contains(extension)) {
+    return 'Documents';
+  }
+  if (const {
+    '.zip',
+    '.gz',
+    '.tar',
+    '.7z',
+    '.rar',
+    '.bz2',
+    '.xz',
+    '.dmg',
+    '.iso',
+  }.contains(extension)) {
+    return 'Archives & disk images';
+  }
+  if (const {
+    '.dart',
+    '.swift',
+    '.kt',
+    '.java',
+    '.py',
+    '.rs',
+    '.go',
+    '.js',
+    '.ts',
+    '.tsx',
+    '.jsx',
+    '.c',
+    '.cc',
+    '.cpp',
+    '.h',
+    '.hpp',
+    '.css',
+    '.html',
+    '.json',
+    '.yaml',
+    '.yml',
+    '.toml',
+    '.xml',
+    '.sh',
+    '.sql',
+  }.contains(extension)) {
+    return 'Code & configuration';
+  }
+  return 'Other';
+}
+
 class FolderScanResult {
   const FolderScanResult(
     this.files,
@@ -18,12 +122,14 @@ class FolderScanResult {
     this.cancelled, {
     this.duplicates = const [],
     this.devFolders = const [],
+    this.storageCategories = const [],
   });
   final List<LargeFile> files;
   final int skipped;
   final bool cancelled;
   final List<List<LargeFile>> duplicates;
   final List<DevFolder> devFolders;
+  final List<StorageCategory> storageCategories;
 }
 
 class DevFolder {
@@ -317,6 +423,8 @@ class LocalFolderScanner implements FolderScanner {
     final folderBytes = <String, int>{};
     var skipped = 0;
     var filesSeen = 0;
+    final categoryBytes = <String, int>{};
+    final categoryCounts = <String, int>{};
     onProgress?.call(const ScanProgress(ScanPhase.discovering, 0, 0, 0));
     Future<void> recordDevFolder(
       DevFolder candidate,
@@ -387,6 +495,10 @@ class LocalFolderScanner implements FolderScanner {
               final stat = await entity.stat();
               if (stat.type == FileSystemEntityType.file) {
                 filesSeen++;
+                final category = categoryForPath(entity.path);
+                categoryBytes[category] =
+                    (categoryBytes[category] ?? 0) + stat.size;
+                categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
                 if (filesSeen % 128 == 0) {
                   onProgress?.call(
                     ScanProgress(ScanPhase.discovering, filesSeen, 0, 0),
@@ -522,6 +634,18 @@ class LocalFolderScanner implements FolderScanner {
             locationSource: folder.locationSource,
           ),
         ),
+      ),
+      storageCategories: List.unmodifiable(
+        (categoryBytes.entries
+            .map(
+              (entry) => StorageCategory(
+                entry.key,
+                entry.value,
+                categoryCounts[entry.key]!,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.bytes.compareTo(a.bytes))),
       ),
     );
   }
