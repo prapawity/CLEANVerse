@@ -1,5 +1,7 @@
 # Device Care — desktop foundation
 
+> CLEANVerse is in the research and architecture phase. See [project documentation](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), [safety requirements](docs/SAFETY.md), [research](docs/RESEARCH.md), and [roadmap](docs/ROADMAP.md). The Python prototype below is experimental and has not passed the planned removal safety gate.
+
 A local, review-first desktop storage scanner for Windows, macOS, and Linux. This is an early prototype, not a complete implementation of the five-platform product plan.
 
 ## Run
@@ -20,4 +22,5 @@ Scanning is local and makes no network requests. A local history of files moved 
 ## Scope and limitations
 
 There is no Android or iOS application, packaged installer, account, billing, cloud cleanup, malware scanning, app management, automated temporary-file rules, storage visualization, or integrated history viewer yet. Desktop builds have not been validated across all platforms. The app does not follow symbolic links and may report inaccessible or changing files as scan issues. SHA-256 matches are used to identify exact duplicates; hard-linked files alone are not treated as separate copies. Scan results are estimates, not a guarantee of recoverable space. The app relies on operating-system Trash behavior and cannot guarantee recovery. Avoid scanning sensitive system folders or running with elevated privileges.
+
 
