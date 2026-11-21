@@ -14,7 +14,7 @@ In progress: desktop folder selection, session-only path exclusions, an extensio
 
 ## Phase 3 — review and recoverable removal
 
-Complete platform-specific threat review. Implement recovery-capable operations only where verified; report per-item outcomes and skip unsupported operations. Complete the safety test matrix before a limited beta with an incident response path.
+In progress: Developer Cleanup supports explicit selection and an in-memory review of discovered project and tool storage candidates. Moving to Trash is disabled. Complete platform-specific threat review. Implement recovery-capable operations only where verified; report per-item outcomes and skip unsupported operations. Complete the safety test matrix before a limited beta with an incident response path.
 
 ## Phase 4 — expansion
 

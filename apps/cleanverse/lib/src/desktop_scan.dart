@@ -5,6 +5,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 
+import 'cleanup_plan.dart';
+
 class LargeFile {
   const LargeFile(this.path, this.bytes);
   final String path;
@@ -772,6 +774,56 @@ class FolderScanViewModel extends ChangeNotifier {
   bool findDevFolders = false;
   final List<String> _navigationHistory = [];
   bool get canGoBack => _navigationHistory.isNotEmpty && !busy;
+  final Set<String> _selectedCleanupPaths = {};
+  bool isCleanupSelected(String path) => _selectedCleanupPaths.contains(path);
+  int get selectedCleanupCount => _selectedCleanupPaths.length;
+
+  CleanupPlan? get cleanupPlan {
+    final scan = result;
+    final scope = root;
+    if (busy ||
+        scan == null ||
+        scope == null ||
+        _selectedCleanupPaths.isEmpty) {
+      return null;
+    }
+    final candidates = scan.devFolders
+        .where((folder) => _selectedCleanupPaths.contains(folder.path))
+        .map(
+          (folder) => CleanupCandidate(
+            path: folder.path,
+            category: folder.category,
+            note: folder.note,
+            logicalBytes: folder.logicalBytes,
+            risk: folder.category == 'Xcode archives'
+                ? CleanupRisk.potentiallyImportant
+                : CleanupRisk.review,
+            projectMarker: folder.projectMarker,
+            locationSource: folder.locationSource,
+          ),
+        )
+        .toList();
+    return CleanupPlan(
+      scope: scope,
+      partial: scan.cancelled || scan.skipped > 0,
+      candidates: candidates,
+    );
+  }
+
+  void selectCleanupCandidate(String path, bool selected) {
+    if (busy ||
+        result == null ||
+        !result!.devFolders.any((folder) => folder.path == path)) {
+      return;
+    }
+    if (selected) {
+      _selectedCleanupPaths.add(path);
+    } else {
+      _selectedCleanupPaths.remove(path);
+    }
+    notifyListeners();
+  }
+
   final List<String> _exclusions = [];
   List<String> get exclusions => List.unmodifiable(_exclusions);
 
@@ -790,6 +842,7 @@ class FolderScanViewModel extends ChangeNotifier {
         result = null;
         root = null;
         _navigationHistory.clear();
+        _selectedCleanupPaths.clear();
       }
     } catch (_) {
       error = 'Unable to select a folder. Try again.';
@@ -809,6 +862,7 @@ class FolderScanViewModel extends ChangeNotifier {
     root = null;
     progress = null;
     _navigationHistory.clear();
+    _selectedCleanupPaths.clear();
     notifyListeners();
   }
 
@@ -821,6 +875,7 @@ class FolderScanViewModel extends ChangeNotifier {
     root = null;
     progress = null;
     _navigationHistory.clear();
+    _selectedCleanupPaths.clear();
     notifyListeners();
     try {
       final selected = await pickFolder();
@@ -887,6 +942,7 @@ class FolderScanViewModel extends ChangeNotifier {
     result = null;
     progress = null;
     root = selected;
+    _selectedCleanupPaths.clear();
     notifyListeners();
     try {
       await _scanRoot(selected);
@@ -914,6 +970,7 @@ class FolderScanViewModel extends ChangeNotifier {
     result = null;
     root = null;
     _navigationHistory.clear();
+    _selectedCleanupPaths.clear();
     notifyListeners();
   }
 
@@ -923,6 +980,7 @@ class FolderScanViewModel extends ChangeNotifier {
     result = null;
     root = null;
     _navigationHistory.clear();
+    _selectedCleanupPaths.clear();
     notifyListeners();
   }
 

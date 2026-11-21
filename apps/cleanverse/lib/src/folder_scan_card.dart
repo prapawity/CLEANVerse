@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'desktop_scan.dart';
+import 'cleanup_plan.dart';
 
 class FolderScanCard extends StatefulWidget {
   const FolderScanCard({super.key, this.scanner, this.pickFolder});
@@ -249,6 +250,13 @@ class _FolderScanCardState extends State<FolderScanCard> {
           ],
           if (model.findDevFolders) ...[
             const SizedBox(height: 12),
+            const Text(
+              'Developer Cleanup',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const Text(
+              'Select folders to review. Cleanup and removal are not available yet.',
+            ),
             Text('Developer folders: ${result.devFolders.length}'),
             const Text(
               'Candidates use project markers or possible cache locations. Sizes are logical bytes scanned, may be incomplete and are not reclaimable-space estimates. Up to 200 are shown.',
@@ -264,7 +272,12 @@ class _FolderScanCardState extends State<FolderScanCard> {
             for (final folder in result.devFolders.where(
               (folder) => folder.projectMarker != null,
             ))
-              _developerFolderCard(folder),
+              _developerFolderCard(
+                folder,
+                selected: model.isCleanupSelected(folder.path),
+                onSelected: (selected) =>
+                    model.selectCleanupCandidate(folder.path, selected),
+              ),
             if (result.devFolders.any((folder) => folder.projectMarker == null))
               const Padding(
                 padding: EdgeInsets.only(top: 12),
@@ -276,7 +289,23 @@ class _FolderScanCardState extends State<FolderScanCard> {
             for (final folder in result.devFolders.where(
               (folder) => folder.projectMarker == null,
             ))
-              _developerFolderCard(folder),
+              _developerFolderCard(
+                folder,
+                selected: model.isCleanupSelected(folder.path),
+                onSelected: (selected) =>
+                    model.selectCleanupCandidate(folder.path, selected),
+              ),
+            if (result.devFolders.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('${model.selectedCleanupCount} selected for review'),
+              OutlinedButton.icon(
+                onPressed: model.cleanupPlan == null
+                    ? null
+                    : () => _showCleanupReview(context, model.cleanupPlan!),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: const Text('Review selection'),
+              ),
+            ],
           ],
           for (final file in result.files)
             Card(
@@ -291,7 +320,11 @@ class _FolderScanCardState extends State<FolderScanCard> {
   );
 }
 
-Widget _developerFolderCard(DevFolder folder) => Card(
+Widget _developerFolderCard(
+  DevFolder folder, {
+  required bool selected,
+  required ValueChanged<bool> onSelected,
+}) => Card(
   child: Padding(
     padding: const EdgeInsets.all(12),
     child: Column(
@@ -312,8 +345,78 @@ Widget _developerFolderCard(DevFolder folder) => Card(
           ),
         const Text('Review required · Ownership and active use not verified'),
         Text(folder.note),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          value: selected,
+          onChanged: (value) => onSelected(value ?? false),
+          title: Text('Select ${folder.category} for review'),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
       ],
     ),
+  ),
+);
+
+Future<void> _showCleanupReview(
+  BuildContext context,
+  CleanupPlan plan,
+) => showDialog<void>(
+  context: context,
+  builder: (dialogContext) => AlertDialog(
+    title: const Text('Review developer folders'),
+    content: SizedBox(
+      width: 600,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SelectableText('Scan scope: ${plan.scope}'),
+            if (plan.partial)
+              const Text('The scan was incomplete; this list may omit items.'),
+            const SizedBox(height: 12),
+            const Text(
+              'These are scan snapshots. Items may have changed. Shared caches, hard links and offline dependencies can make sizes misleading. Nothing will be moved or deleted.',
+            ),
+            for (final item in plan.candidates) ...[
+              const Divider(height: 24),
+              Text(
+                item.category,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              SelectableText(item.path),
+              Text(
+                item.risk == CleanupRisk.potentiallyImportant
+                    ? 'May contain important data — review carefully'
+                    : 'Review required — safety and active use are not verified',
+              ),
+              Text(
+                'Observed logical size: ${formatBytes(item.logicalBytes)}; reclaimable space is unknown.',
+              ),
+              if (item.projectMarker != null)
+                SelectableText('Project marker: ${item.projectMarker}'),
+              if (item.locationSource != null)
+                Text('Location source: ${item.locationSource}'),
+              Text(item.note),
+            ],
+            const SizedBox(height: 16),
+            const Text(
+              'Moving to Trash is unavailable until platform-specific safety checks are completed.',
+            ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      const FilledButton(
+        onPressed: null,
+        child: Text('Move to Trash unavailable'),
+      ),
+      TextButton(
+        onPressed: () => Navigator.of(dialogContext).pop(),
+        child: const Text('Close'),
+      ),
+    ],
   ),
 );
 

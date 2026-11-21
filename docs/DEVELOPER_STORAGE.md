@@ -18,6 +18,10 @@ Additional candidates include the pip cache (`PIP_CACHE_DIR`, `XDG_CACHE_HOME` o
 
 ## Why cleanup needs a separate design
 
+The current Developer Cleanup interface allows users to select discovered project folders and tool storage candidates and review an in-memory snapshot. Nothing is selected automatically. Review shows source, scope, observed logical sizes and possible impacts; Xcode archives are flagged as potentially important, and all other candidates require review. These labels are not safety or ownership determinations. Selections are cleared when scan options, scope, or exclusions change. Moving to Trash is disabled, and no delete, restore, background cleanup, or persistent history capability exists.
+
+Before enabling any removal, verify selection reset on rescans, exclusions and navigation; changed and replaced items; symlinks, junctions and hard links; shared caches and offline dependencies; denied permissions; running tools; and unavailable or partial Trash operations. Use temporary fixtures and verify native behavior separately on every supported OS. UI, accessibility, selection and removal behavior remain untested for this change at the owner's request.
+
 Project dependency and build directories may contain local edits, unavailable packages or active build state. Deleting may break offline builds, require downloads and slow rebuilds. Gradle caches can be shared and concurrently locked; Cargo home also contains config and credentials and its internal structure is not stable. npm describes its cache as self-healing, so blanket cleanup is not always beneficial. Custom environment variables and tool configuration can move cache locations.
 
 Before implementing removal, design an explicit allowlist per tool, identify ownership and active processes, validate identities and scope at operation time, distinguish Trash support and permanent operations, disclose downstream effects, and complete `SAFETY.md` release gates. Do not classify whole home directories or credentials as caches. Whole-machine discovery needs an explicit drive/scope picker, permissions, exclusions, filesystem boundaries and honest partial-results reporting.
