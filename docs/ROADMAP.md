@@ -4,7 +4,7 @@
 
 Validate product boundaries and platform research. Establish project documentation, safe-development rules, and initial threat model. Keep the existing Python prototype labeled experimental; do not expand destructive functionality until the safety gate is met.
 
-## Phase 1 — runnable Flutter foundation
+## Phase 1 — runnable Flutter foundation (in progress)
 
 Create Flutter project with Windows, macOS, Linux, Android and iOS hosts; pin SDK and configure format/analyze/test CI. Build a capability-aware shell, accessibility baseline, navigation and honest unsupported states. Add a fake scan repository and unit/widget tests; no real file access or deletion. Build and test on available hosts; mark other platforms unverified.
 

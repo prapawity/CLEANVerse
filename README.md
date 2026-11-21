@@ -1,5 +1,7 @@
 # Device Care — desktop foundation
 
+The Flutter application foundation is in [apps/cleanverse](apps/cleanverse/README.md). It currently displays sample data only; real scanning and file removal are not implemented.
+
 > CLEANVerse is in the research and architecture phase. See [project documentation](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), [safety requirements](docs/SAFETY.md), [research](docs/RESEARCH.md), and [roadmap](docs/ROADMAP.md). The Python prototype below is experimental and has not passed the planned removal safety gate.
 
 A local, review-first desktop storage scanner for Windows, macOS, and Linux. This is an early prototype, not a complete implementation of the five-platform product plan.
