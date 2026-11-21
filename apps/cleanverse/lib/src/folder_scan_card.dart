@@ -172,6 +172,35 @@ class _FolderScanCardState extends State<FolderScanCard> {
               ),
             _StorageBreakdown(categories: result.storageCategories),
           ],
+          if (result.folderSummaries.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Text(
+              'Largest folders in this scope',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const Text(
+              'Showing up to 20 top-level groups with files found. Sizes are logical, may overlap physical storage and may be incomplete.',
+            ),
+            if (result.cancelled || result.skipped > 0)
+              const Text(
+                'Folder totals are partial because the scan was cancelled or items were skipped.',
+              ),
+            for (final summary in result.folderSummaries)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SelectableText(summary.label),
+                      Text(
+                        '${formatBytes(summary.bytes)} · ${summary.fileCount} ${summary.fileCount == 1 ? 'file' : 'files'} scanned',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
           if (model.findDuplicates) ...[
             const SizedBox(height: 12),
             Text('Matching groups: ${result.duplicates.length}'),

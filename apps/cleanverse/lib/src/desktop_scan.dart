@@ -19,6 +19,14 @@ class StorageCategory {
   final int fileCount;
 }
 
+@immutable
+class FolderSummary {
+  const FolderSummary(this.label, this.bytes, this.fileCount);
+  final String label;
+  final int bytes;
+  final int fileCount;
+}
+
 String categoryForPath(String path) {
   final extension = p.extension(path).toLowerCase();
   if (const {
@@ -123,6 +131,7 @@ class FolderScanResult {
     this.duplicates = const [],
     this.devFolders = const [],
     this.storageCategories = const [],
+    this.folderSummaries = const [],
   });
   final List<LargeFile> files;
   final int skipped;
@@ -130,6 +139,7 @@ class FolderScanResult {
   final List<List<LargeFile>> duplicates;
   final List<DevFolder> devFolders;
   final List<StorageCategory> storageCategories;
+  final List<FolderSummary> folderSummaries;
 }
 
 class DevFolder {
@@ -425,6 +435,12 @@ class LocalFolderScanner implements FolderScanner {
     var filesSeen = 0;
     final categoryBytes = <String, int>{};
     final categoryCounts = <String, int>{};
+    final topFolderBytes = <String, int>{};
+    final topFolderCounts = <String, int>{};
+    var rootBytes = 0;
+    var rootCount = 0;
+    var overflowBytes = 0;
+    var overflowCount = 0;
     onProgress?.call(const ScanProgress(ScanPhase.discovering, 0, 0, 0));
     Future<void> recordDevFolder(
       DevFolder candidate,
@@ -499,6 +515,23 @@ class LocalFolderScanner implements FolderScanner {
                 categoryBytes[category] =
                     (categoryBytes[category] ?? 0) + stat.size;
                 categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+                final relative = p.relative(entity.path, from: root.path);
+                final parts = p.split(relative);
+                if (parts.length == 1) {
+                  rootBytes += stat.size;
+                  rootCount++;
+                } else if (parts.isNotEmpty && parts.first != '..') {
+                  final top = p.join(root.path, parts.first);
+                  if (topFolderBytes.containsKey(top) ||
+                      topFolderBytes.length < 5000) {
+                    topFolderBytes[top] =
+                        (topFolderBytes[top] ?? 0) + stat.size;
+                    topFolderCounts[top] = (topFolderCounts[top] ?? 0) + 1;
+                  } else {
+                    overflowBytes += stat.size;
+                    overflowCount++;
+                  }
+                }
                 if (filesSeen % 128 == 0) {
                   onProgress?.call(
                     ScanProgress(ScanPhase.discovering, filesSeen, 0, 0),
@@ -646,6 +679,24 @@ class LocalFolderScanner implements FolderScanner {
             )
             .toList()
           ..sort((a, b) => b.bytes.compareTo(a.bytes))),
+      ),
+      folderSummaries: List.unmodifiable(
+        ([
+          for (final entry in topFolderBytes.entries)
+            FolderSummary(entry.key, entry.value, topFolderCounts[entry.key]!),
+          if (rootCount > 0)
+            FolderSummary(
+              'Files directly in selected folder',
+              rootBytes,
+              rootCount,
+            ),
+          if (overflowCount > 0)
+            FolderSummary(
+              'Other folders (more than 5,000)',
+              overflowBytes,
+              overflowCount,
+            ),
+        ]..sort((a, b) => b.bytes.compareTo(a.bytes))).take(20),
       ),
     );
   }

@@ -21,6 +21,40 @@ class CapturingScanner implements FolderScanner {
 
 void main() {
   test(
+    'summarizes top-level folders without counting excluded content',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final first = await Directory(pJoin(root.path, 'first')).create();
+      final nested = await Directory(pJoin(first.path, 'nested')).create();
+      final second = await Directory(pJoin(root.path, 'second')).create();
+      final excluded = await Directory(pJoin(first.path, 'excluded')).create();
+      await File(pJoin(first.path, 'one')).writeAsBytes([1, 2]);
+      await File(pJoin(nested.path, 'two')).writeAsBytes([1, 2, 3]);
+      await File(pJoin(second.path, 'three')).writeAsBytes([1]);
+      await File(pJoin(excluded.path, 'hidden')).writeAsBytes([1, 2, 3, 4]);
+      await File(pJoin(root.path, 'root-file'))
+          .writeAsBytes([1, 2, 3, 4, 5, 6]);
+      final result = await LocalFolderScanner().scan(
+        root.path,
+        () => false,
+        exclusions: [excluded.path],
+      );
+      final groups = {
+        for (final item in result.folderSummaries) item.label: item,
+      };
+      expect(groups[first.path]?.bytes, 5);
+      expect(groups[first.path]?.fileCount, 2);
+      expect(groups[second.path]?.bytes, 1);
+      expect(groups['Files directly in selected folder']?.bytes, 6);
+      expect(
+        result.folderSummaries.first.label,
+        'Files directly in selected folder',
+      );
+    },
+  );
+
+  test(
     'storage breakdown uses scanned logical sizes, types, and exclusions',
     () async {
       final root = await Directory.systemTemp.createTemp('cleanverse_test_');

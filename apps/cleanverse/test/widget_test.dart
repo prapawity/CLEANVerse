@@ -23,6 +23,7 @@ class FakeFolderScanner implements FolderScanner {
     1,
     false,
     storageCategories: const [StorageCategory('Documents', 2048, 1)],
+    folderSummaries: const [FolderSummary('chosen/project', 2048, 1)],
     duplicates: findDuplicates
         ? const [
             [LargeFile('chosen/a.txt', 10), LargeFile('chosen/b.txt', 10)],
@@ -143,6 +144,8 @@ void main() {
     expect(find.textContaining('Results may be incomplete'), findsOneWidget);
     expect(find.text('Storage by file type'), findsOneWidget);
     expect(find.text('Documents: 2.0 KiB · 1 file'), findsOneWidget);
+    expect(find.text('Largest folders in this scope'), findsOneWidget);
+    expect(find.text('chosen/project'), findsOneWidget);
     expect(find.bySemanticsLabel('Documents, 2.0 KiB, 1 file'), findsOneWidget);
     expect(find.textContaining('This breakdown is partial'), findsOneWidget);
   });
