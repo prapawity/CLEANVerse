@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:path/path.dart' as p;
 
 class LargeFile {
   const LargeFile(this.path, this.bytes);
@@ -17,12 +18,30 @@ class FolderScanResult {
 }
 
 abstract interface class FolderScanner {
-  Future<FolderScanResult> scan(String path, bool Function() cancelled);
+  Future<FolderScanResult> scan(
+    String path,
+    bool Function() cancelled, {
+    List<String> exclusions = const [],
+  });
 }
 
 class LocalFolderScanner implements FolderScanner {
   @override
-  Future<FolderScanResult> scan(String path, bool Function() cancelled) async {
+  Future<FolderScanResult> scan(
+    String path,
+    bool Function() cancelled, {
+    List<String> exclusions = const [],
+  }) async {
+    final excluded = exclusions
+        .map((path) => p.normalize(p.absolute(path)))
+        .toList(growable: false);
+    bool isExcluded(String path) {
+      final candidate = p.normalize(p.absolute(path));
+      return excluded.any(
+        (entry) => p.equals(entry, candidate) || p.isWithin(entry, candidate),
+      );
+    }
+
     final root = Directory(path);
     if (await FileSystemEntity.type(path, followLinks: false) !=
         FileSystemEntityType.directory) {
@@ -35,6 +54,7 @@ class LocalFolderScanner implements FolderScanner {
     var skipped = 0;
     while (pending.isNotEmpty && !cancelled()) {
       final directory = pending.removeLast();
+      if (isExcluded(directory.path)) continue;
       try {
         if (await FileSystemEntity.type(directory.path, followLinks: false) !=
             FileSystemEntityType.directory) {
@@ -43,6 +63,7 @@ class LocalFolderScanner implements FolderScanner {
         }
         await for (final entity in directory.list(followLinks: false)) {
           if (cancelled()) break;
+          if (isExcluded(entity.path)) continue;
           try {
             final type = await FileSystemEntity.type(
               entity.path,
@@ -86,11 +107,48 @@ class FolderScanViewModel extends ChangeNotifier {
   final FolderScanner scanner;
   final Future<String?> Function() pickFolder;
   bool busy = false;
+  bool pickingExclusion = false;
   bool _cancelled = false;
   bool _disposed = false;
   String? root;
   String? error;
   FolderScanResult? result;
+  final List<String> _exclusions = [];
+  List<String> get exclusions => List.unmodifiable(_exclusions);
+
+  Future<void> addExclusion() async {
+    if (busy) return;
+    busy = true;
+    pickingExclusion = true;
+    error = null;
+    notifyListeners();
+    try {
+      final selected = await pickFolder();
+      if (_disposed || selected == null) return;
+      final normalized = p.normalize(p.absolute(selected));
+      if (!_exclusions.any((value) => p.equals(value, normalized))) {
+        _exclusions.add(normalized);
+        result = null;
+        root = null;
+      }
+    } catch (_) {
+      error = 'Unable to select a folder. Try again.';
+    } finally {
+      if (!_disposed) {
+        busy = false;
+        pickingExclusion = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  void removeExclusion(String path) {
+    if (busy) return;
+    _exclusions.remove(path);
+    result = null;
+    root = null;
+    notifyListeners();
+  }
 
   Future<void> start() async {
     if (busy) return;
@@ -105,7 +163,11 @@ class FolderScanViewModel extends ChangeNotifier {
       if (_disposed || _cancelled || selected == null) return;
       root = selected;
       notifyListeners();
-      result = await scanner.scan(selected, () => _cancelled || _disposed);
+      result = await scanner.scan(
+        selected,
+        () => _cancelled || _disposed,
+        exclusions: List.unmodifiable(_exclusions),
+      );
     } catch (_) {
       error = 'Unable to scan this folder. Check access and try again.';
     } finally {

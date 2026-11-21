@@ -44,17 +44,37 @@ class _FolderScanCardState extends State<FolderScanCard> {
               : 'Folder scanning is available on desktop. Mobile scanning is not available yet.',
         ),
         const SizedBox(height: 12),
-        if (model.busy)
+        if (model.busy && !model.pickingExclusion)
           OutlinedButton(
             onPressed: model.cancel,
             child: const Text('Cancel scan'),
           )
-        else
+        else if (!model.busy)
           FilledButton.tonalIcon(
             onPressed: supported ? model.start : null,
             icon: const Icon(Icons.folder_open),
             label: const Text('Choose and scan folder'),
           ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: supported && !model.busy ? model.addExclusion : null,
+          icon: const Icon(Icons.folder_off_outlined),
+          label: const Text('Exclude a folder'),
+        ),
+        if (model.exclusions.isNotEmpty) ...[
+          const Text('Excluded from future scans for this session:'),
+          for (final path in model.exclusions)
+            ListTile(
+              title: SelectableText(path),
+              trailing: IconButton(
+                tooltip: 'Remove exclusion',
+                onPressed: model.busy
+                    ? null
+                    : () => model.removeExclusion(path),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+        ],
         if (model.busy)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),

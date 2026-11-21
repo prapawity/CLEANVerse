@@ -8,7 +8,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 class FakeFolderScanner implements FolderScanner {
   @override
-  Future<FolderScanResult> scan(String path, bool Function() cancelled) async =>
+  Future<FolderScanResult> scan(
+    String path,
+    bool Function() cancelled, {
+    List<String> exclusions = const [],
+  }) async =>
       const FolderScanResult([LargeFile('chosen/example.txt', 2048)], 1, false);
 }
 
