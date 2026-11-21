@@ -20,6 +20,66 @@ class CapturingScanner implements FolderScanner {
 
 void main() {
   test(
+    'global cache candidates honor environment, scope and exclusions',
+    () async {
+      final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+      addTearDown(() => root.delete(recursive: true));
+      final gradleHome = await Directory(pJoin(root.path, 'gradle')).create();
+      final cache = await Directory(pJoin(gradleHome.path, 'caches')).create();
+      await File(pJoin(cache.path, 'artifact')).writeAsBytes([1, 2, 3, 4]);
+      final scanner = LocalFolderScanner(
+        environment: {'GRADLE_USER_HOME': gradleHome.path},
+        windows: false,
+      );
+      final result = await scanner.scan(
+        root.path,
+        () => false,
+        findDevFolders: true,
+      );
+      expect(result.devFolders, hasLength(1));
+      expect(result.devFolders.single.category, 'Gradle global caches');
+      expect(
+        result.devFolders.single.locationSource,
+        'GRADLE_USER_HOME environment variable',
+      );
+      expect(result.devFolders.single.logicalBytes, 4);
+      expect(
+        (await scanner.scan(
+          cache.path,
+          () => false,
+          findDevFolders: true,
+        )).devFolders.single.path,
+        cache.path,
+      );
+      expect(
+        (await scanner.scan(
+          root.path,
+          () => false,
+          findDevFolders: true,
+          exclusions: [gradleHome.path],
+        )).devFolders,
+        isEmpty,
+      );
+      expect((await scanner.scan(root.path, () => false)).devFolders, isEmpty);
+    },
+  );
+
+  test('relative environment override is ignored without default fallback', () {
+    final candidates = globalCacheCandidates({
+      'HOME': pJoin(Directory.systemTemp.path, 'home'),
+      'CARGO_HOME': 'relative',
+    }, windows: false);
+    expect(
+      candidates.any((item) => item.category == 'Cargo registry archive cache'),
+      isFalse,
+    );
+    expect(
+      candidates.any((item) => item.category == 'Gradle global caches'),
+      isTrue,
+    );
+  });
+
+  test(
     'classifies developer folders only with a matching parent marker',
     () async {
       final root = await Directory.systemTemp.createTemp('cleanverse_test_');

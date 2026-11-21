@@ -69,7 +69,7 @@ class _FolderScanCardState extends State<FolderScanCard> {
                 : null,
             title: const Text('Find developer folders'),
             subtitle: const Text(
-              'Identify project dependencies and build folders inside the selected scope. No files are removed.',
+              'Identify project folders and possible global caches inside the selected scope. No files are removed.',
             ),
             controlAffinity: ListTileControlAffinity.leading,
           ),
@@ -177,7 +177,7 @@ class _FolderScanCardState extends State<FolderScanCard> {
             const SizedBox(height: 12),
             Text('Developer folders: ${result.devFolders.length}'),
             const Text(
-              'Candidates identified by folder and project marker. Sizes are logical bytes scanned, may be incomplete and are not reclaimable-space estimates. Up to 200 are shown.',
+              'Candidates use project markers or possible cache locations. Sizes are logical bytes scanned, may be incomplete and are not reclaimable-space estimates. Up to 200 are shown.',
             ),
             for (final folder in result.devFolders)
               Card(
@@ -191,6 +191,10 @@ class _FolderScanCardState extends State<FolderScanCard> {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       SelectableText(folder.path),
+                      if (folder.locationSource != null)
+                        Text(
+                          'Global cache candidate · ${folder.locationSource}',
+                        ),
                       if (folder.projectMarker != null)
                         SelectableText(
                           'Project marker: ${folder.projectMarker}',

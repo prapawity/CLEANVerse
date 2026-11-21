@@ -34,6 +34,7 @@ class DevFolder {
     this.logicalBytes = 0,
     this.projectMarker,
     this.modified,
+    this.locationSource,
   });
   final String path;
   final String category;
@@ -41,6 +42,66 @@ class DevFolder {
   final int logicalBytes;
   final String? projectMarker;
   final DateTime? modified;
+  final String? locationSource;
+}
+
+/// Candidates only; a tool's config file or command-line flags may override these paths.
+List<DevFolder> globalCacheCandidates(
+  Map<String, String> env, {
+  required bool windows,
+}) {
+  String? absolute(String? value) =>
+      value != null && value.trim().isNotEmpty && p.isAbsolute(value)
+      ? p.normalize(value)
+      : null;
+  final home = absolute(env[windows ? 'USERPROFILE' : 'HOME']);
+  final localAppData = windows ? absolute(env['LOCALAPPDATA']) : null;
+  final gradleOverride = absolute(env['GRADLE_USER_HOME']);
+  final cargoOverride = absolute(env['CARGO_HOME']);
+  final pubOverride = absolute(env['PUB_CACHE']);
+  bool configured(String name) => (env[name]?.trim().isNotEmpty ?? false);
+  final gradleHome = configured('GRADLE_USER_HOME')
+      ? gradleOverride
+      : (home == null ? null : p.join(home, '.gradle'));
+  final cargoHome = configured('CARGO_HOME')
+      ? cargoOverride
+      : (home == null ? null : p.join(home, '.cargo'));
+  final pubHome = configured('PUB_CACHE')
+      ? pubOverride
+      : (windows
+            ? (localAppData == null
+                  ? null
+                  : p.join(localAppData, 'Pub', 'Cache'))
+            : (home == null ? null : p.join(home, '.pub-cache')));
+  return [
+    if (gradleHome != null)
+      DevFolder(
+        p.join(gradleHome, 'caches'),
+        'Gradle global caches',
+        'Shared build caches may be in use; builds may need to regenerate or download data.',
+        locationSource: gradleOverride == null
+            ? 'Default location; other tool configuration may override it'
+            : 'GRADLE_USER_HOME environment variable',
+      ),
+    if (cargoHome != null)
+      DevFolder(
+        p.join(cargoHome, 'registry', 'cache'),
+        'Cargo registry archive cache',
+        'Downloaded dependencies may be needed for offline builds.',
+        locationSource: cargoOverride == null
+            ? 'Default location; other tool configuration may override it'
+            : 'CARGO_HOME environment variable',
+      ),
+    if (pubHome != null)
+      DevFolder(
+        pubHome,
+        'Dart / Flutter package cache',
+        'Projects may need to fetch dependencies again; cached content may be shared.',
+        locationSource: pubOverride == null
+            ? 'Default location; other tool configuration may override it'
+            : 'PUB_CACHE environment variable',
+      ),
+  ];
 }
 
 Future<DevFolder?> classifyDevFolder(String path) async {
@@ -160,6 +221,11 @@ abstract interface class FolderScanner {
 }
 
 class LocalFolderScanner implements FolderScanner {
+  LocalFolderScanner({Map<String, String>? environment, bool? windows})
+    : environment = environment ?? Platform.environment,
+      windows = windows ?? Platform.isWindows;
+  final Map<String, String> environment;
+  final bool windows;
   @override
   Future<FolderScanResult> scan(
     String path,
@@ -190,8 +256,49 @@ class LocalFolderScanner implements FolderScanner {
     final candidates = <int, List<_Candidate>>{};
     var candidateCount = 0;
     final devFolders = <DevFolder>[];
+    final globalCaches = findDevFolders
+        ? globalCacheCandidates(environment, windows: windows)
+        : <DevFolder>[];
     final folderBytes = <String, int>{};
     var skipped = 0;
+    Future<void> recordDevFolder(
+      DevFolder candidate,
+      FileSystemEntity entity,
+    ) async {
+      if (devFolders.length >= 200) {
+        skipped++;
+        return;
+      }
+      final info = await entity.stat();
+      devFolders.add(
+        DevFolder(
+          candidate.path,
+          candidate.category,
+          candidate.note,
+          projectMarker: candidate.projectMarker,
+          modified: info.modified,
+          locationSource: candidate.locationSource,
+        ),
+      );
+      folderBytes[candidate.path] = 0;
+    }
+
+    DevFolder? globalFor(String path) {
+      for (final candidate in globalCaches) {
+        if (p.equals(
+          p.normalize(p.absolute(path)),
+          p.normalize(candidate.path),
+        )) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    if (findDevFolders && !isExcluded(root.path)) {
+      final match = globalFor(root.path);
+      if (match != null) await recordDevFolder(match, root);
+    }
     while (pending.isNotEmpty && !cancelled()) {
       final directory = pending.removeLast();
       if (isExcluded(directory.path)) continue;
@@ -211,23 +318,11 @@ class LocalFolderScanner implements FolderScanner {
             );
             if (type == FileSystemEntityType.directory) {
               if (findDevFolders) {
-                final detected = await classifyDevFolder(entity.path);
+                final detected =
+                    globalFor(entity.path) ??
+                    await classifyDevFolder(entity.path);
                 if (detected != null) {
-                  if (devFolders.length < 200) {
-                    final info = await entity.stat();
-                    devFolders.add(
-                      DevFolder(
-                        detected.path,
-                        detected.category,
-                        detected.note,
-                        projectMarker: detected.projectMarker,
-                        modified: info.modified,
-                      ),
-                    );
-                    folderBytes[detected.path] = 0;
-                  } else {
-                    skipped++;
-                  }
+                  await recordDevFolder(detected, entity);
                 }
               }
               pending.add(Directory(entity.path));
@@ -342,6 +437,7 @@ class LocalFolderScanner implements FolderScanner {
             logicalBytes: folderBytes[folder.path]!,
             projectMarker: folder.projectMarker,
             modified: folder.modified,
+            locationSource: folder.locationSource,
           ),
         ),
       ),

@@ -31,6 +31,12 @@ class FakeFolderScanner implements FolderScanner {
               'Review before cleanup.',
               projectMarker: 'chosen/project/package.json',
             ),
+            DevFolder(
+              'chosen/cache',
+              'Gradle global caches',
+              'Shared cache.',
+              locationSource: 'GRADLE_USER_HOME environment variable',
+            ),
           ]
         : const [],
   );
@@ -131,7 +137,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Choose and scan folder'));
     await tester.pumpAndSettle();
-    expect(find.text('Developer folders: 1'), findsOneWidget);
+    expect(find.text('Developer folders: 2'), findsOneWidget);
     expect(find.textContaining('Node.js dependencies'), findsOneWidget);
     expect(
       find.text('Project marker: chosen/project/package.json'),
@@ -139,6 +145,12 @@ void main() {
     );
     expect(
       find.text('Review required · Ownership and active use not verified'),
+      findsNWidgets(2),
+    );
+    expect(
+      find.text(
+        'Global cache candidate · GRADLE_USER_HOME environment variable',
+      ),
       findsOneWidget,
     );
     expect(

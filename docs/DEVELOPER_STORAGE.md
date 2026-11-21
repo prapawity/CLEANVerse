@@ -1,6 +1,6 @@
 # Developer storage discovery
 
-Status: experimental read-only discovery, 2026-11-21. No deletion, whole-machine scan, or global cache discovery is implemented. The user selects the scan root and exclusions; scope, symlink and partial-result limitations remain those of the desktop scanner.
+Status: experimental read-only discovery, 2026-11-21. No deletion or whole-machine scan is implemented. The user selects the scan root and exclusions; scope, symlink and partial-result limitations remain those of the desktop scanner.
 
 ## Supported candidates
 
@@ -8,10 +8,14 @@ Within the chosen root, detect `node_modules` with a parent `package.json`, `tar
 
 Sizes sum logical file lengths observed during traversal. They may be partial, can count hard links or nested candidates more than once, and do not measure physical storage or reclaimable bytes.
 
+### Possible global caches
+
+The scanner recognizes Gradle `caches` under `GRADLE_USER_HOME`, Cargo `registry/cache` under `CARGO_HOME`, and the Dart package cache under `PUB_CACHE`, or the documented platform defaults if no corresponding environment variable is set. These are detected only when the candidate directory is inside or is the selected root and is not excluded. Relative or invalid configured paths are skipped rather than silently replaced by a default. The label identifies whether the path came from an environment variable or a possible default; tool configuration files, command-line overrides, and child-process environments are not inspected, so a path is a candidate and may not be the active cache. No tool commands are run. Global cache paths may contain valuable shared or manually modified data and must never be automatically deleted.
+
 ## Why cleanup needs a separate design
 
 Project dependency and build directories may contain local edits, unavailable packages or active build state. Deleting may break offline builds, require downloads and slow rebuilds. Gradle caches can be shared and concurrently locked; Cargo home also contains config and credentials and its internal structure is not stable. npm describes its cache as self-healing, so blanket cleanup is not always beneficial. Custom environment variables and tool configuration can move cache locations.
 
 Before implementing removal, design an explicit allowlist per tool, identify ownership and active processes, validate identities and scope at operation time, distinguish Trash support and permanent operations, disclose downstream effects, and complete `SAFETY.md` release gates. Do not classify whole home directories or credentials as caches. Whole-machine discovery needs an explicit drive/scope picker, permissions, exclusions, filesystem boundaries and honest partial-results reporting.
 
-Sources: [Gradle dependency cache](https://docs.gradle.org/current/userguide/dependency_caching.html), [Gradle user home](https://docs.gradle.org/current/userguide/directory_layout.html), [Cargo home](https://doc.rust-lang.org/cargo/guide/cargo-home.html), [npm cache](https://docs.npmjs.com/cli/v9/commands/npm-cache/).
+Sources: [Gradle dependency cache](https://docs.gradle.org/current/userguide/dependency_caching.html), [Gradle user home](https://docs.gradle.org/current/userguide/directory_layout.html), [Cargo home](https://doc.rust-lang.org/cargo/guide/cargo-home.html), [Dart package cache](https://dart.dev/tools/pub/cmd/pub-get), [npm cache](https://docs.npmjs.com/cli/v9/commands/npm-cache/).
