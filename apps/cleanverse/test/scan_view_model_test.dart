@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:cleanverse/src/demo_scan.dart';
+import 'package:cleanverse/src/features/example/demo_scan.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class PendingRepository implements ScanRepository {

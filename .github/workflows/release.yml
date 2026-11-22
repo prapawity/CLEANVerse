@@ -1,0 +1,143 @@
+name: Release
+
+# Push a tag like v1.2.0 (matching pubspec.yaml) to build all desktop
+# platforms and create a DRAFT release with a signed latest.json.
+# Review the draft, then publish it; installed apps see it after that.
+#
+# Required settings:
+#   secret   UPDATE_SIGNING_KEY  Ed25519 private key (tool/release/sign_manifest.dart keygen)
+#   variable UPDATE_PUBLIC_KEY   matching public key, compiled into the app
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.50.1'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        name: Tag must match pubspec version
+        run: |
+          version=$(grep -E '^version:' apps/cleanverse/pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/' | tr -d '\r')
+          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match pubspec version $version" >&2
+            exit 1
+          fi
+          if [ -z "${{ vars.UPDATE_PUBLIC_KEY }}" ]; then
+            echo "Repository variable UPDATE_PUBLIC_KEY is missing" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/cleanverse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test tool
+      - run: flutter analyze
+      - run: flutter test
+
+  build:
+    needs: [verify, test]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+          - os: macos-latest
+            target: macos
+          - os: ubuntu-22.04
+            target: linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/cleanverse
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev clang cmake pkg-config
+      - run: flutter pub get
+      - run: flutter build ${{ matrix.target }} --release --dart-define=CLEANVERSE_UPDATE_KEY=${{ vars.UPDATE_PUBLIC_KEY }}
+      - name: Package
+        run: |
+          v=${{ needs.verify.outputs.version }}
+          mkdir -p ../../dist
+          case "${{ matrix.target }}" in
+            windows)
+              (cd build/windows/x64/runner/Release && 7z a -tzip "../../../../../../../dist/CLEANVerse-$v-windows-x64.zip" .) ;;
+            macos)
+              hdiutil create -volname CLEANVerse -srcfolder build/macos/Build/Products/Release/cleanverse.app \
+                -ov -format UDZO "../../dist/CLEANVerse-$v-macos-universal.dmg" ;;
+            linux)
+              tar -C build/linux/x64/release/bundle -czf "../../dist/CLEANVerse-$v-linux-x64.tar.gz" . ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Sign manifest
+        working-directory: apps/cleanverse
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          test -n "$UPDATE_SIGNING_KEY" || { echo "UPDATE_SIGNING_KEY secret is missing" >&2; exit 1; }
+          flutter pub get
+          dart run tool/release/sign_manifest.dart manifest \
+            --repo "${{ github.repository }}" --tag "${{ github.ref_name }}" \
+            --version "${{ needs.verify.outputs.version }}" \
+            --notes "See the release page for details." \
+            --out ../../dist ../../dist/CLEANVerse-*
+          (cd ../../dist && sha256sum CLEANVerse-* latest.json > SHA256SUMS.txt)
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --verify-tag --draft --generate-notes \
+            --title "CLEANVerse ${{ needs.verify.outputs.version }}"

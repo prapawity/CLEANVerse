@@ -21,3 +21,15 @@ These are design requirements, not a claim the current prototype satisfies them.
 
 Use temporary fixtures. Test permissions, revoked access, symlinks, hard links, changed files, inaccessible directories, external and network volumes, cloud placeholders, interrupted operations, and low storage. Test removal on every supported OS and volume. Establish security review and a data-loss escalation path before beta removal features.
 
+## Removal decision (2026-11-22)
+
+The owner approved user-confirmed removal on desktop. Implemented in `apps/cleanverse/lib/src/cleanup/`:
+
+- Nothing is pre-selected. Every removal goes through a confirmation listing each item, its path and whether it will be deleted permanently or moved to the Recycle Bin/Trash.
+- Default mode is per item: rebuildable caches (temp, browser cache folders, package-manager caches) are deleted permanently; project dependencies, user files, duplicates and possibly unique data (e.g. Xcode archives) go to the Recycle Bin/Trash. The user can override this for all items in the dialog.
+- Trash uses Windows Recycle Bin (VisualBasic FileSystem via PowerShell), macOS Finder, or Linux `gio trash`/`trash-put`. If trash fails the item is reported as not cleaned; it never falls back to permanent deletion.
+- Each item is re-checked just before acting: it must still exist, not be a link, stay inside its reviewed location, and not be a top-level or home folder. Links are never followed. Items in use are skipped and reported.
+- Duplicates always keep at least one copy per group. Results separate space freed now from bytes moved to the bin. Trash is never emptied.
+- Junk locations are limited to the user's own profile; no administrator rights. Browser cleanup touches cache folders only, not cookies, history or passwords.
+
+Verified: unit tests with temporary fixtures, and a read-only junk check on Windows 11. Not yet verified: macOS and Linux trash, cloud-synced folders, network volumes, and real-world removal on any OS.

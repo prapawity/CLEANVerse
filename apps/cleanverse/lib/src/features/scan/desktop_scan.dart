@@ -5,12 +5,16 @@ import 'package:file_selector/file_selector.dart';
 import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 
-import 'cleanup_plan.dart';
+import 'package:cleanverse/src/features/developer/cleanup_plan.dart';
 
 class LargeFile {
-  const LargeFile(this.path, this.bytes);
+  const LargeFile(this.path, this.bytes, {this.modified});
   final String path;
   final int bytes;
+
+  /// Last modification time observed during the scan, if known. This is not
+  /// a last-opened time; access times are unreliable across platforms.
+  final DateTime? modified;
 }
 
 @immutable
@@ -37,6 +41,24 @@ class FolderSummary {
 
 String categoryForPath(String path) {
   final extension = p.extension(path).toLowerCase();
+  if (const {
+    '.pdb',
+    '.dill',
+    '.obj',
+    '.o',
+    '.a',
+    '.lib',
+    '.exp',
+    '.ilk',
+    '.pch',
+    '.ipch',
+    '.class',
+    '.pyc',
+    '.dex',
+    '.tlog',
+  }.contains(extension)) {
+    return 'Build output';
+  }
   if (const {
     '.jpg',
     '.jpeg',
@@ -140,8 +162,16 @@ class FolderScanResult {
     this.devFolders = const [],
     this.storageCategories = const [],
     this.folderSummaries = const [],
+    this.filesSeen = 0,
+    this.totalBytes = 0,
   });
   final List<LargeFile> files;
+
+  /// Number of regular files observed in the scanned scope.
+  final int filesSeen;
+
+  /// Sum of logical file sizes observed. Not physical or reclaimable space.
+  final int totalBytes;
   final int skipped;
   final bool cancelled;
   final List<List<LargeFile>> duplicates;
@@ -627,7 +657,9 @@ class LocalFolderScanner implements FolderScanner {
                   }
                 }
                 if (files.length < 100 || stat.size > files.last.bytes) {
-                  files.add(LargeFile(entity.path, stat.size));
+                  files.add(
+                    LargeFile(entity.path, stat.size, modified: stat.modified),
+                  );
                   files.sort((a, b) => b.bytes.compareTo(a.bytes));
                   if (files.length > 100) files.removeLast();
                 }
@@ -721,6 +753,8 @@ class LocalFolderScanner implements FolderScanner {
       List.unmodifiable(files.take(100)),
       skipped,
       cancelled(),
+      filesSeen: filesSeen,
+      totalBytes: categoryBytes.values.fold<int>(0, (sum, v) => sum + v),
       duplicates: List.unmodifiable(
         matches.values
             .where((group) => group.length > 1)
@@ -977,6 +1011,31 @@ class FolderScanViewModel extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  /// Scans the current folder again with the current options, without
+  /// asking the user to pick it again.
+  Future<void> rescan() async {
+    final current = root;
+    if (busy || current == null) return;
+    _navigationHistory.clear();
+    await _navigateTo(current);
+  }
+
+  /// Turns an option on and rescans the current scope.
+  Future<void> enableAndRescan({
+    bool duplicates = false,
+    bool devFolders = false,
+  }) async {
+    if (busy) return;
+    final current = root;
+    if (duplicates) findDuplicates = true;
+    if (devFolders) findDevFolders = true;
+    if (current == null) {
+      notifyListeners();
+      return;
+    }
+    await rescan();
   }
 
   void cancel() {

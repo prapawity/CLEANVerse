@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:cleanverse/src/desktop_scan.dart';
+import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class CapturingScanner implements FolderScanner {
@@ -157,7 +157,7 @@ void main() {
     final mac = globalCacheCandidates(env, windows: false, macos: true);
     expect(
       mac.where((item) => item.category.startsWith('Xcode')),
-      hasLength(2),
+      hasLength(3),
     );
   });
 
