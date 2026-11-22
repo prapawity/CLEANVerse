@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'desktop_scan.dart';
 import 'cleanup_plan.dart';
+import 'developer_quick_check.dart';
 
 class FolderScanCard extends StatefulWidget {
   const FolderScanCard({
@@ -195,6 +196,10 @@ class _FolderScanCardState extends State<FolderScanCard> {
                     fontSize: 13,
                     height: 1.4,
                   ),
+                ),
+                DeveloperQuickCheck(
+                  enabled: supported && !model.busy,
+                  exclusions: model.exclusions,
                 ),
                 Material(
                   color: Colors.transparent,
