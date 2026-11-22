@@ -7,7 +7,13 @@ import 'desktop_scan.dart';
 import 'cleanup_plan.dart';
 
 class FolderScanCard extends StatefulWidget {
-  const FolderScanCard({super.key, this.scanner, this.pickFolder});
+  const FolderScanCard({
+    super.key,
+    this.scanner,
+    this.pickFolder,
+    this.developerKey,
+  });
+  final GlobalKey? developerKey;
   final FolderScanner? scanner;
   final Future<String?> Function()? pickFolder;
   @override
@@ -41,115 +47,70 @@ class _FolderScanCardState extends State<FolderScanCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 640;
-              final intro = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Scan a folder',
+                style: TextStyle(
+                  fontSize: 27,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -.45,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                supported
+                    ? 'Choose a folder to inspect its contents and review large files.'
+                    : 'Folder scanning is available on desktop. Mobile scanning is not available yet.',
+                style: const TextStyle(
+                  color: Color(0xffb2bfd4),
+                  fontSize: 14,
+                  height: 1.55,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xff27374a),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Storage scan',
-                      style: TextStyle(
-                        color: Color(0xff99dffa),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
+                  if (model.busy && !model.pickingExclusion)
+                    OutlinedButton(
+                      onPressed: model.cancelling ? null : model.cancel,
+                      child: Text(
+                        model.cancelling ? 'Cancelling…' : 'Cancel scan',
                       ),
+                    )
+                  else if (!model.busy)
+                    FilledButton.icon(
+                      onPressed: supported ? model.start : null,
+                      icon: const Icon(Icons.folder_open_outlined, size: 19),
+                      label: const Text('Choose and scan folder'),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Find space for what’s next.',
-                    style: TextStyle(
-                      fontSize: 27,
-                      height: 1.2,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -.45,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    supported
-                        ? 'Choose a folder to see what’s inside. Review large files, developer folders, and more — all on your device.'
-                        : 'Folder scanning is available on desktop. Mobile scanning is not available yet.',
-                    style: const TextStyle(
-                      color: Color(0xffb2bfd4),
-                      fontSize: 14,
-                      height: 1.55,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      if (model.busy && !model.pickingExclusion)
-                        OutlinedButton(
-                          onPressed: model.cancelling ? null : model.cancel,
-                          child: Text(
-                            model.cancelling ? 'Cancelling…' : 'Cancel scan',
-                          ),
-                        )
-                      else if (!model.busy)
-                        FilledButton.icon(
-                          onPressed: supported ? model.start : null,
-                          icon: const Icon(
-                            Icons.folder_open_outlined,
-                            size: 19,
-                          ),
-                          label: const Text('Choose and scan folder'),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed: supported && !model.busy
-                            ? model.addExclusion
-                            : null,
-                        icon: const Icon(Icons.folder_off_outlined, size: 19),
-                        label: const Text('Exclude a folder'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        size: 15,
-                        color: Color(0xff9bdcc5),
-                      ),
-                      SizedBox(width: 7),
-                      Flexible(
-                        child: Text(
-                          'Private scan · No files are removed',
-                          style: TextStyle(
-                            color: Color(0xffaabbd0),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
+                  OutlinedButton.icon(
+                    onPressed: supported && !model.busy
+                        ? model.addExclusion
+                        : null,
+                    icon: const Icon(Icons.folder_off_outlined, size: 19),
+                    label: const Text('Exclude a folder'),
                   ),
                 ],
-              );
-              return wide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(flex: 5, child: intro),
-                        const SizedBox(width: 20),
-                        const Expanded(flex: 3, child: _OrbitIllustration()),
-                      ],
-                    )
-                  : intro;
-            },
+              ),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 15, color: Color(0xff9bdcc5)),
+                  SizedBox(width: 7),
+                  Flexible(
+                    child: Text(
+                      'Private scan · No files are removed',
+                      style: TextStyle(color: Color(0xffaabbd0), fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 28),
           Container(
@@ -189,6 +150,50 @@ class _FolderScanCardState extends State<FolderScanCard> {
                       style: TextStyle(color: Color(0xffaab8ce), fontSize: 12),
                     ),
                     controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            key: widget.developerKey,
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xff20263a),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xff3d4863)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.code_rounded,
+                      color: Color(0xffc2a7f5),
+                      size: 19,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Developer',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Review dependencies and tool caches in the folder you choose.',
+                  style: TextStyle(
+                    color: Color(0xffb2bfd4),
+                    fontSize: 13,
+                    height: 1.4,
                   ),
                 ),
                 Material(
@@ -449,76 +454,6 @@ class _FolderScanCardState extends State<FolderScanCard> {
       ),
     ),
   );
-}
-
-class _OrbitIllustration extends StatelessWidget {
-  const _OrbitIllustration();
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: Center(
-      child: SizedBox(
-        width: 230,
-        height: 200,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 190,
-              height: 190,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [Color(0xff344966), Color(0x00202438)],
-                ),
-              ),
-            ),
-            CustomPaint(size: const Size(210, 160), painter: _OrbitPainter()),
-            Image.asset(
-              'assets/brand/cleanverse-mark-proposal.png',
-              width: 122,
-              height: 122,
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _OrbitPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final line = Paint()
-      ..color = const Color(0xff536c88)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.rotate(-.34);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: 202, height: 82),
-      line,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: 162, height: 60),
-      line..color = const Color(0xff544d79),
-    );
-    canvas.drawCircle(
-      const Offset(-88, 20),
-      3.5,
-      Paint()..color = const Color(0xff73d5fb),
-    );
-    canvas.drawCircle(
-      const Offset(76, -26),
-      3,
-      Paint()..color = const Color(0xffc2a7f5),
-    );
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 Widget _developerFolderCard(

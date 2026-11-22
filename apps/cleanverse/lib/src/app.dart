@@ -82,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ScanViewModel model = ScanViewModel(widget.repository);
   final _scrollController = ScrollController();
   final _sampleKey = GlobalKey();
+  final _developerKey = GlobalKey();
 
   void _scrollToOverview() {
     if (_scrollController.hasClients) {
@@ -93,8 +94,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _scrollToSample() {
-    final context = _sampleKey.currentContext;
+  void _scrollToDeveloper() => _scrollTo(_developerKey);
+
+  void _scrollToSample() => _scrollTo(_sampleKey);
+
+  void _scrollTo(GlobalKey key) {
+    final context = key.currentContext;
     if (context != null) {
       Scrollable.ensureVisible(
         context,
@@ -122,6 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (wide)
                 _Sidebar(
                   onOverview: _scrollToOverview,
+                  onDeveloper: _scrollToDeveloper,
                   onSample: _scrollToSample,
                 ),
               Expanded(
@@ -145,26 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'A little space goes a long way.',
-                                    style: TextStyle(
-                                      fontSize: 30,
-                                      height: 1.16,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Understand what’s taking up room, and decide what matters.',
-                                    style: TextStyle(
-                                      color: mutedColor,
-                                      fontSize: 15,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 28),
-                                  const FolderScanCard(),
+                                  FolderScanCard(developerKey: _developerKey),
                                   const SizedBox(height: 24),
                                   _SamplePanel(key: _sampleKey, model: model),
                                   const SizedBox(height: 24),
@@ -196,7 +183,7 @@ class _Brand extends StatelessWidget {
     children: [
       ExcludeSemantics(
         child: Image.asset(
-          'assets/brand/cleanverse-mark-proposal.png',
+          'assets/brand/cleanverse-brush-proposal.png',
           width: compact ? 36 : 44,
           height: compact ? 36 : 44,
         ),
@@ -244,8 +231,13 @@ class _Brand extends StatelessWidget {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.onOverview, required this.onSample});
+  const _Sidebar({
+    required this.onOverview,
+    required this.onDeveloper,
+    required this.onSample,
+  });
   final VoidCallback onOverview;
+  final VoidCallback onDeveloper;
   final VoidCallback onSample;
   @override
   Widget build(BuildContext context) => Container(
@@ -284,6 +276,12 @@ class _Sidebar extends StatelessWidget {
                   label: 'Storage overview',
                   selected: true,
                   onPressed: onOverview,
+                ),
+                const SizedBox(height: 4),
+                _NavItem(
+                  icon: Icons.code_rounded,
+                  label: 'Developer',
+                  onPressed: onDeveloper,
                 ),
                 const SizedBox(height: 4),
                 _NavItem(
