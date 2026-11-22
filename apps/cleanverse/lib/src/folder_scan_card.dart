@@ -31,293 +31,494 @@ class _FolderScanCardState extends State<FolderScanCard> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: model,
-    builder: (context, _) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Find large files',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          supported
-              ? 'Choose a folder to scan locally. Nothing will be changed or deleted.'
-              : 'Folder scanning is available on desktop. Mobile scanning is not available yet.',
-        ),
-        const SizedBox(height: 12),
-        Material(
-          color: Colors.transparent,
-          child: CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: model.findDuplicates,
-            onChanged: supported && !model.busy
-                ? (value) => model.setFindDuplicates(value ?? false)
-                : null,
-            title: const Text('Find matching files'),
-            subtitle: const Text(
-              'Compares SHA-256 hashes locally for up to 20,000 files. This can take longer.',
-            ),
-            controlAffinity: ListTileControlAffinity.leading,
+    builder: (context, _) => Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xff1d2032),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xff353b53)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 640;
+              final intro = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xff27374a),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Storage scan',
+                      style: TextStyle(
+                        color: Color(0xff99dffa),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Find space for what’s next.',
+                    style: TextStyle(
+                      fontSize: 27,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -.45,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    supported
+                        ? 'Choose a folder to see what’s inside. Review large files, developer folders, and more — all on your device.'
+                        : 'Folder scanning is available on desktop. Mobile scanning is not available yet.',
+                    style: const TextStyle(
+                      color: Color(0xffb2bfd4),
+                      fontSize: 14,
+                      height: 1.55,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      if (model.busy && !model.pickingExclusion)
+                        OutlinedButton(
+                          onPressed: model.cancelling ? null : model.cancel,
+                          child: Text(
+                            model.cancelling ? 'Cancelling…' : 'Cancel scan',
+                          ),
+                        )
+                      else if (!model.busy)
+                        FilledButton.icon(
+                          onPressed: supported ? model.start : null,
+                          icon: const Icon(
+                            Icons.folder_open_outlined,
+                            size: 19,
+                          ),
+                          label: const Text('Choose and scan folder'),
+                        ),
+                      OutlinedButton.icon(
+                        onPressed: supported && !model.busy
+                            ? model.addExclusion
+                            : null,
+                        icon: const Icon(Icons.folder_off_outlined, size: 19),
+                        label: const Text('Exclude a folder'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        size: 15,
+                        color: Color(0xff9bdcc5),
+                      ),
+                      SizedBox(width: 7),
+                      Flexible(
+                        child: Text(
+                          'Private scan · No files are removed',
+                          style: TextStyle(
+                            color: Color(0xffaabbd0),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+              return wide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(flex: 5, child: intro),
+                        const SizedBox(width: 20),
+                        const Expanded(flex: 3, child: _OrbitIllustration()),
+                      ],
+                    )
+                  : intro;
+            },
           ),
-        ),
-        Material(
-          color: Colors.transparent,
-          child: CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: model.findDevFolders,
-            onChanged: supported && !model.busy
-                ? (value) => model.setFindDevFolders(value ?? false)
-                : null,
-            title: const Text('Find developer folders'),
-            subtitle: const Text(
-              'Identify project folders and possible global caches inside the selected scope. No files are removed.',
+          const SizedBox(height: 28),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xff171a2b),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xff32384e)),
             ),
-            controlAffinity: ListTileControlAffinity.leading,
-          ),
-        ),
-        if (model.busy && !model.pickingExclusion)
-          OutlinedButton(
-            onPressed: model.cancelling ? null : model.cancel,
-            child: Text(model.cancelling ? 'Cancelling…' : 'Cancel scan'),
-          )
-        else if (!model.busy)
-          FilledButton.icon(
-            onPressed: supported ? model.start : null,
-            icon: const Icon(Icons.folder_open),
-            label: const Text('Choose and scan folder'),
-          ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: supported && !model.busy ? model.addExclusion : null,
-          icon: const Icon(Icons.folder_off_outlined),
-          label: const Text('Exclude a folder'),
-        ),
-        if (model.exclusions.isNotEmpty) ...[
-          const Text('Excluded from future scans for this session:'),
-          for (final path in model.exclusions)
-            ListTile(
-              title: SelectableText(path),
-              trailing: IconButton(
-                tooltip: 'Remove exclusion',
-                onPressed: model.busy
-                    ? null
-                    : () => model.removeExclusion(path),
-                icon: const Icon(Icons.close),
-              ),
-            ),
-        ],
-        if (model.busy)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    model.pickingExclusion
-                        ? 'Choose a folder to exclude.'
-                        : model.root == null
-                        ? 'Choose a folder to scan.'
-                        : model.cancelling
-                        ? 'Stopping the scan…'
-                        : model.progress?.phase == ScanPhase.comparing
-                        ? 'Comparing files: ${model.progress!.compared} of ${model.progress!.toCompare} checked.'
-                        : 'Scanning: ${model.progress?.filesSeen ?? 0} files found so far.',
+                const Text(
+                  'Include in scan',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xffd9e3f4),
                   ),
                 ),
-                const SizedBox(height: 8),
-                const LinearProgressIndicator(),
+                const SizedBox(height: 2),
+                Material(
+                  color: Colors.transparent,
+                  child: CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    value: model.findDuplicates,
+                    onChanged: supported && !model.busy
+                        ? (value) => model.setFindDuplicates(value ?? false)
+                        : null,
+                    title: const Text(
+                      'Find matching files',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    subtitle: const Text(
+                      'Compare file contents locally using SHA-256, up to 20,000 files.',
+                      style: TextStyle(color: Color(0xffaab8ce), fontSize: 12),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    value: model.findDevFolders,
+                    onChanged: supported && !model.busy
+                        ? (value) => model.setFindDevFolders(value ?? false)
+                        : null,
+                    title: const Text(
+                      'Find developer folders',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    subtitle: const Text(
+                      'Identify project dependencies and possible tool caches in this scope.',
+                      style: TextStyle(color: Color(0xffaab8ce), fontSize: 12),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ),
               ],
             ),
           ),
-        if (model.root != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: SelectableText('Folder: ${model.root}'),
-          ),
-        if (model.canGoBack)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: model.goBack,
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Back to previous folder'),
-            ),
-          ),
-        if (model.error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(
-              model.error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-        if (model.result case final result?) ...[
           const SizedBox(height: 12),
-          Text(
-            result.cancelled
-                ? 'Scan cancelled. Results are partial.'
-                : result.skipped > 0
-                ? 'Scan finished with skipped items. Results may be incomplete.'
-                : 'Scan finished.',
-          ),
-          Text(
-            'Skipped or inaccessible items: ${result.skipped}. Showing up to 100 largest files.',
-          ),
-          if (result.files.isEmpty)
-            const Text('No files found in the scanned scope.'),
-          if (result.storageCategories.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            const Text(
-              'Storage by file type',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const Text(
-              'Based on file extensions in this scan. Logical file sizes can include hard links and are not physical or reclaimable disk space.',
-            ),
-            if (result.cancelled || result.skipped > 0)
-              const Text(
-                'This breakdown is partial because the scan was cancelled or items were skipped.',
+          if (model.exclusions.isNotEmpty) ...[
+            const Text('Excluded from future scans for this session:'),
+            for (final path in model.exclusions)
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  title: SelectableText(path),
+                  trailing: IconButton(
+                    tooltip: 'Remove exclusion',
+                    onPressed: model.busy
+                        ? null
+                        : () => model.removeExclusion(path),
+                    icon: const Icon(Icons.close),
+                  ),
+                ),
               ),
-            _StorageBreakdown(categories: result.storageCategories),
           ],
-          if (result.folderSummaries.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            const Text(
-              'Largest folders in this scope',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const Text(
-              'Showing up to 20 top-level groups with files found. Sizes are logical, may overlap physical storage and may be incomplete.',
-            ),
-            if (result.cancelled || result.skipped > 0)
-              const Text(
-                'Folder totals are partial because the scan was cancelled or items were skipped.',
+          if (model.busy)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      model.pickingExclusion
+                          ? 'Choose a folder to exclude.'
+                          : model.root == null
+                          ? 'Choose a folder to scan.'
+                          : model.cancelling
+                          ? 'Stopping the scan…'
+                          : model.progress?.phase == ScanPhase.comparing
+                          ? 'Comparing files: ${model.progress!.compared} of ${model.progress!.toCompare} checked.'
+                          : 'Scanning: ${model.progress?.filesSeen ?? 0} files found so far.',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(),
+                ],
               ),
-            for (final summary in result.folderSummaries)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SelectableText(summary.label),
-                      Text(
-                        '${formatBytes(summary.bytes)} · ${summary.fileCount} ${summary.fileCount == 1 ? 'file' : 'files'} scanned',
-                      ),
-                      if (summary.folderPath != null)
-                        TextButton.icon(
-                          onPressed: model.busy
-                              ? null
-                              : () => model.openFolder(summary.folderPath!),
-                          icon: const Icon(Icons.folder_open_outlined),
-                          label: const Text('Explore folder'),
+            ),
+          if (model.root != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: SelectableText('Folder: ${model.root}'),
+            ),
+          if (model.canGoBack)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: model.goBack,
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back to previous folder'),
+              ),
+            ),
+          if (model.error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                model.error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          if (model.result case final result?) ...[
+            const SizedBox(height: 12),
+            Text(
+              result.cancelled
+                  ? 'Scan cancelled. Results are partial.'
+                  : result.skipped > 0
+                  ? 'Scan finished with skipped items. Results may be incomplete.'
+                  : 'Scan finished.',
+            ),
+            Text(
+              'Skipped or inaccessible items: ${result.skipped}. Showing up to 100 largest files.',
+            ),
+            if (result.files.isEmpty)
+              const Text('No files found in the scanned scope.'),
+            if (result.storageCategories.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Storage by file type',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const Text(
+                'Based on file extensions in this scan. Logical file sizes can include hard links and are not physical or reclaimable disk space.',
+              ),
+              if (result.cancelled || result.skipped > 0)
+                const Text(
+                  'This breakdown is partial because the scan was cancelled or items were skipped.',
+                ),
+              _StorageBreakdown(categories: result.storageCategories),
+            ],
+            if (result.folderSummaries.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Text(
+                'Largest folders in this scope',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const Text(
+                'Showing up to 20 top-level groups with files found. Sizes are logical, may overlap physical storage and may be incomplete.',
+              ),
+              if (result.cancelled || result.skipped > 0)
+                const Text(
+                  'Folder totals are partial because the scan was cancelled or items were skipped.',
+                ),
+              for (final summary in result.folderSummaries)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SelectableText(summary.label),
+                        Text(
+                          '${formatBytes(summary.bytes)} · ${summary.fileCount} ${summary.fileCount == 1 ? 'file' : 'files'} scanned',
                         ),
-                    ],
+                        if (summary.folderPath != null)
+                          TextButton.icon(
+                            onPressed: model.busy
+                                ? null
+                                : () => model.openFolder(summary.folderPath!),
+                            icon: const Icon(Icons.folder_open_outlined),
+                            label: const Text('Explore folder'),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-          ],
-          if (model.findDuplicates) ...[
-            const SizedBox(height: 12),
-            Text('Matching groups: ${result.duplicates.length}'),
-            const Text(
-              'Matches have the same size and SHA-256 hash. Hard links may appear separately; no space savings are estimated.',
-            ),
-            const Text('Showing up to 50 groups and 20 paths per group.'),
-            for (final group in result.duplicates.take(50))
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${group.length} matching files · ${formatBytes(group.first.bytes)} each',
-                      ),
-                      for (final file in group.take(20))
-                        SelectableText(file.path),
-                    ],
-                  ),
-                ),
-              ),
-            const SizedBox(height: 12),
-            const Text(
-              'Largest files',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ],
-          if (model.findDevFolders) ...[
-            const SizedBox(height: 12),
-            const Text(
-              'Developer Cleanup',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const Text(
-              'Select folders to review. Cleanup and removal are not available yet.',
-            ),
-            Text('Developer folders: ${result.devFolders.length}'),
-            const Text(
-              'Candidates use project markers or possible cache locations. Sizes are logical bytes scanned, may be incomplete and are not reclaimable-space estimates. Up to 200 are shown.',
-            ),
-            if (result.devFolders.any((folder) => folder.projectMarker != null))
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: Text(
-                  'Project folders',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            for (final folder in result.devFolders.where(
-              (folder) => folder.projectMarker != null,
-            ))
-              _developerFolderCard(
-                folder,
-                selected: model.isCleanupSelected(folder.path),
-                onSelected: (selected) =>
-                    model.selectCleanupCandidate(folder.path, selected),
-              ),
-            if (result.devFolders.any((folder) => folder.projectMarker == null))
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: Text(
-                  'Tool storage candidates',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            for (final folder in result.devFolders.where(
-              (folder) => folder.projectMarker == null,
-            ))
-              _developerFolderCard(
-                folder,
-                selected: model.isCleanupSelected(folder.path),
-                onSelected: (selected) =>
-                    model.selectCleanupCandidate(folder.path, selected),
-              ),
-            if (result.devFolders.isNotEmpty) ...[
+            ],
+            if (model.findDuplicates) ...[
               const SizedBox(height: 12),
-              Text('${model.selectedCleanupCount} selected for review'),
-              OutlinedButton.icon(
-                onPressed: model.cleanupPlan == null
-                    ? null
-                    : () => _showCleanupReview(context, model.cleanupPlan!),
-                icon: const Icon(Icons.fact_check_outlined),
-                label: const Text('Review selection'),
+              Text('Matching groups: ${result.duplicates.length}'),
+              const Text(
+                'Matches have the same size and SHA-256 hash. Hard links may appear separately; no space savings are estimated.',
+              ),
+              const Text('Showing up to 50 groups and 20 paths per group.'),
+              for (final group in result.duplicates.take(50))
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${group.length} matching files · ${formatBytes(group.first.bytes)} each',
+                        ),
+                        for (final file in group.take(20))
+                          SelectableText(file.path),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              const Text(
+                'Largest files',
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ],
-          ],
-          for (final file in result.files)
-            Card(
-              child: ListTile(
-                title: SelectableText(file.path),
-                trailing: Text(formatBytes(file.bytes)),
+            if (model.findDevFolders) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Developer Cleanup',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
-            ),
+              const Text(
+                'Select folders to review. Cleanup and removal are not available yet.',
+              ),
+              Text('Developer folders: ${result.devFolders.length}'),
+              const Text(
+                'Candidates use project markers or possible cache locations. Sizes are logical bytes scanned, may be incomplete and are not reclaimable-space estimates. Up to 200 are shown.',
+              ),
+              if (result.devFolders.any(
+                (folder) => folder.projectMarker != null,
+              ))
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(
+                    'Project folders',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              for (final folder in result.devFolders.where(
+                (folder) => folder.projectMarker != null,
+              ))
+                _developerFolderCard(
+                  folder,
+                  selected: model.isCleanupSelected(folder.path),
+                  onSelected: (selected) =>
+                      model.selectCleanupCandidate(folder.path, selected),
+                ),
+              if (result.devFolders.any(
+                (folder) => folder.projectMarker == null,
+              ))
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(
+                    'Tool storage candidates',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              for (final folder in result.devFolders.where(
+                (folder) => folder.projectMarker == null,
+              ))
+                _developerFolderCard(
+                  folder,
+                  selected: model.isCleanupSelected(folder.path),
+                  onSelected: (selected) =>
+                      model.selectCleanupCandidate(folder.path, selected),
+                ),
+              if (result.devFolders.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text('${model.selectedCleanupCount} selected for review'),
+                OutlinedButton.icon(
+                  onPressed: model.cleanupPlan == null
+                      ? null
+                      : () => _showCleanupReview(context, model.cleanupPlan!),
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Review selection'),
+                ),
+              ],
+            ],
+            for (final file in result.files)
+              Card(
+                child: ListTile(
+                  title: SelectableText(file.path),
+                  trailing: Text(formatBytes(file.bytes)),
+                ),
+              ),
+          ],
         ],
-      ],
+      ),
     ),
   );
+}
+
+class _OrbitIllustration extends StatelessWidget {
+  const _OrbitIllustration();
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Center(
+      child: SizedBox(
+        width: 230,
+        height: 200,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 190,
+              height: 190,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0xff344966), Color(0x00202438)],
+                ),
+              ),
+            ),
+            CustomPaint(size: const Size(210, 160), painter: _OrbitPainter()),
+            Image.asset(
+              'assets/brand/cleanverse-mark-proposal.png',
+              width: 122,
+              height: 122,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _OrbitPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final line = Paint()
+      ..color = const Color(0xff536c88)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(-.34);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: 202, height: 82),
+      line,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: 162, height: 60),
+      line..color = const Color(0xff544d79),
+    );
+    canvas.drawCircle(
+      const Offset(-88, 20),
+      3.5,
+      Paint()..color = const Color(0xff73d5fb),
+    );
+    canvas.drawCircle(
+      const Offset(76, -26),
+      3,
+      Paint()..color = const Color(0xffc2a7f5),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 Widget _developerFolderCard(

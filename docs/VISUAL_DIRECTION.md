@@ -4,9 +4,9 @@ Status: initial implementation; subject to refinement and accessibility testing.
 
 ## Brand reference
 
-GITVerse by PRAPAWITY uses a ringed-planet mark, blue/violet accents, Catppuccin-inspired surfaces and system-oriented typography. CLEANVerse adopts this family identity, uses its own name, and emphasizes approachable storage care. The planet image is reused from [GITVerse](https://github.com/prapawity/GITVerse-by-PRAPAWITY) at commit `3a368904f54f5102345682431ef1a45c67e460ba`; the MIT license is included alongside the asset. This is an in-app mark, not yet the operating-system application icon.
+GITVerse by PRAPAWITY uses a ringed-planet mark, blue/violet accents, Catppuccin-inspired surfaces and system-oriented typography. CLEANVerse adopts this family identity, uses its own name, and emphasizes approachable storage care. Its in-app preview currently uses the provisional Orbital C concept, a blue C-shaped planet with orbital rings inspired by [GITVerse](https://github.com/prapawity/GITVerse-by-PRAPAWITY). This mark is a proposal, not an approved final identity, and does not replace the operating-system application icon. The earlier GITVerse asset and its MIT license remain in the repository as a reference.
 
-The initial dark palette maps canvas `#1e1e2e`, panel `#181825`, outline `#45475a`, action `#4cc2ff`, and violet accent `#cba6f7`. Text and controls use Flutter's dark color scheme. Use native/system text rather than requiring a font download. A light theme is a future task, not an implemented feature.
+The redesigned preview uses canvas `#141626`, panel `#1d2032`, outline `#353b53`, action `#73d5fb`, and violet accent `#c2a7f5`. Text and controls use Flutter's dark color scheme. Use native/system text rather than requiring a font download. A light theme is a future task, not an implemented feature.
 
 ## CleanMyMac research
 
@@ -16,4 +16,4 @@ For CLEANVerse, use a clear primary task, calm explanatory copy and reviewable r
 
 ## Validation
 
-Check desktop and narrow layouts, 200% text scaling, keyboard and screen-reader labels, contrast, and actual states for scanning, cancellation, partial results and errors. The current version has automated widget checks; native platform, screen-reader and theme coverage still require device verification. See `DESIGN_REVIEW.md`.
+Check desktop and narrow layouts, 200% text scaling, keyboard and screen-reader labels, contrast, and actual states for scanning, cancellation, partial results and errors. The redesigned interface has passed static analysis but has not been tested or verified on a native device; prior widget tests do not validate this redesign. See `DESIGN_REVIEW.md`.

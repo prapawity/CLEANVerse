@@ -5,27 +5,70 @@ import 'package:flutter/material.dart';
 import 'demo_scan.dart';
 import 'folder_scan_card.dart';
 
+const canvasColor = Color(0xff141626);
+const panelColor = Color(0xff1d2032);
+const borderColor = Color(0xff353b53);
+const mutedColor = Color(0xffaeb8d0);
+const cyanColor = Color(0xff73d5fb);
+const violetColor = Color(0xffc2a7f5);
+
 class CleanVerseApp extends StatelessWidget {
   const CleanVerseApp({super.key, required this.repository});
   final ScanRepository repository;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'CLEANVerse',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
+  Widget build(BuildContext context) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: cyanColor,
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xff4cc2ff),
+      primary: cyanColor,
+      surface: panelColor,
+    );
+    return MaterialApp(
+      title: 'CLEANVerse',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
         brightness: Brightness.dark,
-        primary: const Color(0xff4cc2ff),
-        surface: const Color(0xff181825),
+        colorScheme: scheme,
+        scaffoldBackgroundColor: canvasColor,
+        textTheme: ThemeData.dark().textTheme.apply(
+          bodyColor: const Color(0xffedf0fc),
+          displayColor: const Color(0xfff5f6ff),
+        ),
+        cardTheme: CardThemeData(
+          color: const Color(0xff24283d),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: borderColor),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: cyanColor,
+            foregroundColor: const Color(0xff102031),
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xffd7e4f9),
+            minimumSize: const Size(0, 48),
+            side: const BorderSide(color: Color(0xff505b77)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
       ),
-      scaffoldBackgroundColor: const Color(0xff1e1e2e),
-    ),
-    home: HomeScreen(repository: repository),
-  );
+      home: HomeScreen(repository: repository),
+    );
+  }
 }
 
 class HomeScreen extends StatefulWidget {
@@ -37,159 +80,439 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final ScanViewModel model = ScanViewModel(widget.repository);
+  final _scrollController = ScrollController();
+  final _sampleKey = GlobalKey();
+
+  void _scrollToOverview() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _scrollToSample() {
+    final context = _sampleKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   @override
   void dispose() {
     model.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Row(
-        children: [
-          ExcludeSemantics(
-            child: Image(
-              image: AssetImage('assets/brand/planet.png'),
-              width: 48,
-              height: 48,
-            ),
-          ),
-          SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+    body: SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 900;
+          return Row(
             children: [
-              Text.rich(
-                TextSpan(
+              if (wide)
+                _Sidebar(
+                  onOverview: _scrollToOverview,
+                  onSample: _scrollToSample,
+                ),
+              Expanded(
+                child: Column(
                   children: [
-                    TextSpan(
-                      text: 'CLEAN',
-                      style: TextStyle(
-                        color: Color(0xff4cc2ff),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Verse',
-                      style: TextStyle(
-                        color: Color(0xffcba6f7),
-                        fontWeight: FontWeight.w500,
+                    _TopBar(wide: wide),
+                    Expanded(
+                      child: Scrollbar(
+                        controller: _scrollController,
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          padding: EdgeInsets.fromLTRB(
+                            wide ? 40 : 20,
+                            wide ? 36 : 24,
+                            wide ? 40 : 20,
+                            48,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 1120),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'A little space goes a long way.',
+                                    style: TextStyle(
+                                      fontSize: 30,
+                                      height: 1.16,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Understand what’s taking up room, and decide what matters.',
+                                    style: TextStyle(
+                                      color: mutedColor,
+                                      fontSize: 15,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 28),
+                                  const FolderScanCard(),
+                                  const SizedBox(height: 24),
+                                  _SamplePanel(key: _sampleKey, model: model),
+                                  const SizedBox(height: 24),
+                                  const _Footnote(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                style: TextStyle(fontSize: 20),
-              ),
-              Text(
-                'by PRAPAWITY',
-                style: TextStyle(fontSize: 10, color: Color(0xffbac2de)),
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
-      backgroundColor: Colors.transparent,
     ),
-    body: SafeArea(
-      child: Center(
+  );
+}
+
+class _Brand extends StatelessWidget {
+  const _Brand({this.compact = false});
+  final bool compact;
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.max,
+    children: [
+      ExcludeSemantics(
+        child: Image.asset(
+          'assets/brand/cleanverse-mark-proposal.png',
+          width: compact ? 36 : 44,
+          height: compact ? 36 : 44,
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'CLEAN',
+                    style: TextStyle(
+                      color: cyanColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextSpan(
+                    text: 'Verse',
+                    style: TextStyle(
+                      color: violetColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              style: TextStyle(fontSize: 19, letterSpacing: -.5),
+            ),
+            Text(
+              'by PRAPAWITY',
+              style: TextStyle(
+                color: mutedColor.withValues(alpha: .9),
+                fontSize: 10,
+                letterSpacing: .2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _Sidebar extends StatelessWidget {
+  const _Sidebar({required this.onOverview, required this.onSample});
+  final VoidCallback onOverview;
+  final VoidCallback onSample;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 232,
+    decoration: const BoxDecoration(
+      color: Color(0xff191b2c),
+      border: Border(right: BorderSide(color: Color(0xff2e3248))),
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: ListenableBuilder(
-            listenable: model,
-            builder: (context, _) => ListView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: IntrinsicHeight(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Your space, in perspective.',
-                  style: TextStyle(
-                    fontSize: 32,
-                    height: 1.12,
-                    fontWeight: FontWeight.w800,
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 22, 16, 30),
+                  child: _Brand(),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    'Workspace',
+                    style: TextStyle(
+                      color: mutedColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Explore your files with clarity and control.',
-                  style: Theme.of(context).textTheme.bodyLarge,
+                _NavItem(
+                  icon: Icons.space_dashboard_outlined,
+                  label: 'Storage overview',
+                  selected: true,
+                  onPressed: onOverview,
                 ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xff181825),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xff45475a)),
-                  ),
-                  child: const FolderScanCard(),
+                const SizedBox(height: 4),
+                _NavItem(
+                  icon: Icons.science_outlined,
+                  label: 'Example scan',
+                  onPressed: onSample,
                 ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xff181825),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xff45475a)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.auto_awesome_outlined,
-                        size: 32,
-                        color: Color(0xffcba6f7),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Explore a sample scan',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xff22283a),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xff343d55)),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.shield_outlined,
+                              size: 17,
+                              color: cyanColor,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Private by design',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'This preview uses example data only. It does not access or change files on your device.',
-                      ),
-                      const SizedBox(height: 20),
-                      if (model.status == ScanStatus.scanning)
-                        OutlinedButton(
-                          onPressed: model.cancel,
-                          child: const Text('Cancel preview'),
-                        )
-                      else
-                        OutlinedButton.icon(
-                          onPressed: model.start,
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: Text(
-                            model.status == ScanStatus.complete
-                                ? 'Run example again'
-                                : 'Show example results',
+                        SizedBox(height: 8),
+                        Text(
+                          'Scans stay on this device. No files are removed.',
+                          style: TextStyle(
+                            color: mutedColor,
+                            fontSize: 12,
+                            height: 1.45,
                           ),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                if (model.error != null)
-                  Text(
-                    model.error!,
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.selected = false,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool selected;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: Material(
+      color: selected ? const Color(0xff293a50) : Colors.transparent,
+      borderRadius: BorderRadius.circular(11),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(11),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 46),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: selected ? cyanColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(icon, size: 19, color: selected ? cyanColor : mutedColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                      color: selected ? const Color(0xffeff7ff) : mutedColor,
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.wide});
+  final bool wide;
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 68),
+    padding: EdgeInsets.symmetric(horizontal: wide ? 40 : 20, vertical: 12),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Color(0xff292d42))),
+    ),
+    child: Row(
+      children: [
+        if (wide)
+          const Expanded(
+            child: Text(
+              'Storage overview',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+          )
+        else
+          const Expanded(child: _Brand(compact: true)),
+        const SizedBox(width: 8),
+        const Icon(
+          Icons.lock_outline_rounded,
+          size: 15,
+          color: Color(0xffa4e3d0),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          'On this device',
+          style: TextStyle(color: Color(0xffb8c6d7), fontSize: 12),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SamplePanel extends StatelessWidget {
+  const _SamplePanel({super.key, required this.model});
+  final ScanViewModel model;
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: const Color(0xff1b1e30),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: borderColor),
+    ),
+    child: Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: const Icon(Icons.science_outlined, color: violetColor),
+        title: const Text(
+          'Explore an example',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        subtitle: const Text(
+          'See sample results without scanning your files.',
+          style: TextStyle(color: mutedColor, fontSize: 13),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        children: [
+          ListenableBuilder(
+            listenable: model,
+            builder: (context, _) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This preview uses example data only. It does not access or change files on your device.',
+                  style: TextStyle(color: mutedColor, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                if (model.status == ScanStatus.scanning)
+                  OutlinedButton(
+                    onPressed: model.cancel,
+                    child: const Text('Cancel preview'),
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: model.start,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text(
+                      model.status == ScanStatus.complete
+                          ? 'Run example again'
+                          : 'Show example results',
+                    ),
+                  ),
+                if (model.error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      model.error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                 if (model.status == ScanStatus.scanning)
-                  const LinearProgressIndicator(),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: LinearProgressIndicator(),
+                  ),
                 if (model.status == ScanStatus.complete) ...[
+                  const SizedBox(height: 16),
                   const Text(
                     'Example results',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 4),
-                  const Text('These are not files from your device.'),
-                  const SizedBox(height: 12),
+                  const Text(
+                    'These are not files from your device.',
+                    style: TextStyle(color: mutedColor),
+                  ),
+                  const SizedBox(height: 8),
                   for (final item in model.items)
                     Card(
                       child: ListTile(
@@ -200,22 +523,29 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                 ],
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 12),
-                const Text(
-                  'What is available now',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Desktop folder scanning and file matching are read-only. Mobile scanning and file removal are not available yet.',
-                ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     ),
+  );
+}
+
+class _Footnote extends StatelessWidget {
+  const _Footnote();
+  @override
+  Widget build(BuildContext context) => const Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(Icons.info_outline_rounded, size: 16, color: mutedColor),
+      SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          'Early preview · Desktop scanning is read-only. Cleanup and mobile scanning are not available yet.',
+          style: TextStyle(color: mutedColor, fontSize: 12, height: 1.5),
+        ),
+      ),
+    ],
   );
 }

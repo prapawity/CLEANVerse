@@ -56,6 +56,7 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
+    - assets/brand/cleanverse-mark-proposal.png
     - assets/brand/planet.png
     - assets/brand/GITVERSE-LICENSE.txt
 
