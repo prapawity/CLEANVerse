@@ -10,6 +10,8 @@ import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:cleanverse/src/data/protection.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_page.dart';
 import 'package:cleanverse/src/data/scan_history.dart';
+import 'package:cleanverse/src/features/uninstall/uninstall_page.dart';
+import 'package:cleanverse/src/features/uninstall/uninstall_view_model.dart';
 import 'package:cleanverse/src/features/cleanup/full_disk_access_banner.dart';
 import 'package:cleanverse/src/features/developer/developer_page.dart';
 import 'package:cleanverse/src/features/scan/duplicates_page.dart';
@@ -31,6 +33,7 @@ enum Section {
   largeFiles('Large & old files', Icons.inventory_outlined),
   duplicates('Duplicates', Icons.file_copy_outlined),
   developer('Developer', Icons.code_rounded),
+  uninstall('Uninstaller', Icons.delete_sweep_outlined),
   example('Example scan', Icons.science_outlined),
   settings('Settings', Icons.settings_outlined);
 
@@ -89,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.pickFolder ?? chooseFolder,
   );
   late final CleanupViewModel cleanup = widget.cleanup ?? CleanupViewModel();
+  final UninstallViewModel uninstall = UninstallViewModel();
   final AppSettings settings = AppSettings();
   late final UpdateViewModel updates = UpdateViewModel(settings: settings);
   final ValueNotifier<ScanComparison?> growth = ValueNotifier(null);
@@ -136,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
     updates.dispose();
     settings.dispose();
     growth.dispose();
+    uninstall.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -152,6 +157,10 @@ class _HomeScreenState extends State<HomeScreen> {
       onNavigate: _go,
       settings: settings,
       fullDiskAccess: Platform.isMacOS ? const FullDiskAccessBanner() : null,
+    ),
+    Section.uninstall => UninstallPage(
+      model: uninstall,
+      supported: Platform.isMacOS,
     ),
     Section.spaceLens => SpaceLensPage(model: scan, onNavigate: _go),
     Section.largeFiles => LargeFilesPage(
@@ -306,7 +315,7 @@ class _Brand extends StatelessWidget {
 const _navGroups = [
   ('Scan', [Section.smartScan, Section.cleanup]),
   ('Review', [Section.spaceLens, Section.largeFiles, Section.duplicates]),
-  ('Tools', [Section.developer]),
+  ('Tools', [Section.developer, Section.uninstall]),
   ('Learn', [Section.example]),
   ('App', [Section.settings]),
 ];

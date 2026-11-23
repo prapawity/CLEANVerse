@@ -35,5 +35,6 @@ From the market gap analysis (CleanMyMac, DaisyDisk, StorageRadar, WizTree, WinD
 - Done 2026-11-23: macOS distribution decision (owner): direct distribution, App Sandbox removed so Clean up, Docker and tool commands can reach user caches; not eligible for the Mac App Store as-is. Optional Full Disk Access banner in Clean up (detects denied access by probing protected paths, opens System Settings, dismissible).
 - Done 2026-11-23: opt-in scan history (off by default) with a "What grew" card on the scan summary, comparing with the previous finished scan of the same folder. Stores folder paths and logical sizes only, last 30 scans, locally; turning it off deletes the file.
 - Next: wider developer cache catalog.
-- Later: app uninstaller, scheduled checks and low-disk alerts with tray icon, similar-photo detection, cloud storage cleanup, CLI.
+- Done 2026-11-23: macOS app uninstaller (Tools → Uninstaller). Finds the app plus Library leftovers by bundle id, labels risk, selects nothing, moves to Trash only; system-wide items listed, not removed. Windows/Linux show an unsupported state.
+- Later: vendor-folder leftovers for the uninstaller (e.g. Application Support/Google/AndroidStudio*), scheduled checks and low-disk alerts with tray icon, similar-photo detection, cloud storage cleanup, CLI.
 - Distribution: Developer ID signing with hardened runtime and notarization (required now that the sandbox is off), winget and Homebrew; avoid the Mac App Store sandbox for developer caches.

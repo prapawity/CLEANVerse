@@ -45,3 +45,17 @@ Full Disk Access is optional. CLEANVerse detects that it is missing by listing o
 ## Scan history (2026-11-23)
 
 Opt-in, off by default. When on, each finished (not cancelled) scan saves its root, time, total and the largest folders' paths and logical sizes to `scan_history.json` in the app's data folder; no file names, hashes or contents. At most 30 scans are kept. Turning the setting off deletes the file. Nothing is uploaded. Comparisons with skipped folders are labelled approximate.
+
+## macOS uninstaller (2026-11-23)
+
+Implemented in `apps/cleanverse/lib/src/features/uninstall/`.
+
+- Lists `.app` bundles in /Applications, /Applications/Utilities and ~/Applications (links not followed). Apple apps (`com.apple.*`) and CLEANVerse are never listed.
+- Leftovers are matched in the user's Library by exact bundle id, or the id followed by "." (helpers). A plain prefix never matches (`com.example.app` ≠ `com.example.application`). Name matches are allowed only in Caches, Logs and Application Support, only for specific names, and are labelled Risky and "Matched by name".
+- Risk: caches, logs, saved state and web data Safe; app bundle, preferences, launch agents and scripts Caution; Application Support, Containers and Group Containers Risky (may hold documents).
+- Nothing is selected automatically; "Select everything" is an explicit action. The confirmation offers no permanent option and the view model forces Trash regardless of caller. Each item still passes the removal engine's re-checks.
+- A running app is refused, re-checked just before removal (`ps`); if the check fails the UI warns to quit the app.
+- System-wide items in /Library are listed for information only; no administrator rights are requested.
+- Launch agents are moved to the Trash but not unloaded; they stop after logout/restart.
+
+Verified: unit tests with temporary fixtures and fake plutil/ps/Trash; read-only listing and leftover search on the developer's macOS machine. Not yet verified: real Trash moves of app bundles (including App Store apps owned by root, which may prompt for a password), protected containers on recent macOS, and vendor-folder data that is not named by bundle id.

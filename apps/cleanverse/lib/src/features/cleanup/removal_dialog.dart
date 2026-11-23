@@ -28,6 +28,7 @@ Future<({RemovalMode? override, bool dryRun})?> confirmRemoval(
   required List<RemovalItem> items,
   List<String> warnings = const [],
   ModeChoice initial = ModeChoice.recommended,
+  bool allowModeChoice = true,
 }) {
   final bin = trashName();
   var choice = initial;
@@ -59,40 +60,46 @@ Future<({RemovalMode? override, bool dryRun})?> confirmRemoval(
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: CvSpace.md),
-                  RadioGroup<ModeChoice>(
-                    groupValue: choice,
-                    onChanged: (value) =>
-                        setState(() => choice = value ?? choice),
-                    child: Column(
-                      children: [
-                        RadioListTile<ModeChoice>(
-                          value: ModeChoice.recommended,
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Recommended for each item'),
-                          subtitle: Text(
-                            '$permanentCount rebuildable caches deleted permanently; '
-                            'the rest moved to the $bin.',
+                  if (!allowModeChoice)
+                    Text(
+                      'Everything is moved to the $bin, so you can put it back. '
+                      'Space is freed after you empty the $bin.',
+                    )
+                  else
+                    RadioGroup<ModeChoice>(
+                      groupValue: choice,
+                      onChanged: (value) =>
+                          setState(() => choice = value ?? choice),
+                      child: Column(
+                        children: [
+                          RadioListTile<ModeChoice>(
+                            value: ModeChoice.recommended,
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Recommended for each item'),
+                            subtitle: Text(
+                              '$permanentCount rebuildable caches deleted permanently; '
+                              'the rest moved to the $bin.',
+                            ),
                           ),
-                        ),
-                        RadioListTile<ModeChoice>(
-                          value: ModeChoice.trash,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text('Move everything to the $bin'),
-                          subtitle: Text(
-                            'Can be restored. Space is freed only after you empty the $bin.',
+                          RadioListTile<ModeChoice>(
+                            value: ModeChoice.trash,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Move everything to the $bin'),
+                            subtitle: Text(
+                              'Can be restored. Space is freed only after you empty the $bin.',
+                            ),
                           ),
-                        ),
-                        RadioListTile<ModeChoice>(
-                          value: ModeChoice.permanent,
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Delete everything permanently'),
-                          subtitle: const Text(
-                            'Frees space now. Cannot be undone.',
+                          RadioListTile<ModeChoice>(
+                            value: ModeChoice.permanent,
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Delete everything permanently'),
+                            subtitle: const Text(
+                              'Frees space now. Cannot be undone.',
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   if (permanent > 0)
                     Callout(
                       '$permanent ${permanent == 1 ? 'item' : 'items'} will be deleted permanently and cannot be restored.',
@@ -313,6 +320,7 @@ Future<List<RemovalOutcome>?> runRemovalFlow(
   required List<RemovalItem> items,
   List<String> warnings = const [],
   Future<List<RemovalOutcome>> Function(RemovalMode? override)? execute,
+  bool allowModeChoice = true,
 }) async {
   while (true) {
     if (!context.mounted) return null;
@@ -321,6 +329,7 @@ Future<List<RemovalOutcome>?> runRemovalFlow(
       title: title,
       items: items,
       warnings: warnings,
+      allowModeChoice: allowModeChoice,
     );
     if (choice == null || !context.mounted) return null;
     if (choice.dryRun) {
