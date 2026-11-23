@@ -19,7 +19,7 @@ release/v1.3.0 (version bump PR) ─┘
 
 ### `[preview-only]`
 
-A commit message containing `[preview-only]` builds a Windows preview without running the tests. This applies **only to pushes on work branches**. Pull requests and `main` always run the full checks.
+A commit message containing `[preview-only]` builds a Windows preview without running the tests. It applies **only to pushes on work branches**, and only to rebuild code that already passed the checks; never use it to skip checks for new code changes. Pull requests and `main` always run the full checks.
 
 ## Versioning
 
@@ -61,7 +61,7 @@ A commit message containing `[preview-only]` builds a Windows preview without ru
 
 | Job | Runs on | When | Purpose |
 | --- | --- | --- | --- |
-| `checks` | ubuntu | every PR, push to `main`, work-branch push without `[preview-only]` | format, analyze, test |
+| `checks` | ubuntu | every PR and every push to `main` (work-branch pushes don't run it twice; open a PR) | format, analyze, test |
 | `build` | windows, macos, ubuntu | after `checks` | proves each desktop target compiles; PR builds are uploaded as artifacts for 7 days |
 | `preview` | windows | work-branch push with `[preview-only]` | untested Windows build for quick manual checks |
 

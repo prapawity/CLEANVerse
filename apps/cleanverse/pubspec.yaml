@@ -60,6 +60,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/brand/cleanverse-mark.png
+    - assets/brand/cleanverse-icon-256.png
     - assets/brand/planet.png
     - assets/brand/GITVERSE-LICENSE.txt
 

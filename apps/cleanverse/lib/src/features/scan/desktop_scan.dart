@@ -735,6 +735,10 @@ class LocalFolderScanner implements FolderScanner {
   /// Folders read at the same time.
   static const parallelism = 8;
 
+  /// Developer folders recorded per scan. The Developer page lists them
+  /// lazily, so this only bounds memory on very large disks.
+  static const maxDevFolders = 1000;
+
   /// How often [scan] reports results so far through `onPartial`.
   static const partialInterval = Duration(milliseconds: 1500);
 
@@ -794,7 +798,7 @@ class LocalFolderScanner implements FolderScanner {
       DevFolder candidate,
       FileSystemEntity entity,
     ) async {
-      if (devFolders.length >= 200) {
+      if (devFolders.length >= maxDevFolders) {
         skipped++;
         return false;
       }

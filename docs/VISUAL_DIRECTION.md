@@ -16,7 +16,7 @@ Files (in `apps/cleanverse/`):
 - `assets/brand/cleanverse-mark.svg`: flat mark on a transparent background; rendered to `cleanverse-mark.png` (40 px) with `2.0x/` and `3.0x/` variants for the in-app `_Brand` logo.
 - `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_*.png` (16 to 1024) and `windows/runner/resources/app_icon.ico` (16, 24, 32, 48, 64, 256) are renders of the SVGs above.
 
-Linux has no icon wired yet: it requires a runtime `gtk_window_set_icon` or a desktop-entry install step, which is not set up. The Windows icon has not been checked on a Windows host.
+Linux sets the window icon at runtime from the bundled `assets/brand/cleanverse-icon-256.png` (`gtk_window_set_icon_from_file`); no desktop entry is installed yet, so launchers may still show a generic icon. Window titles read "CLEANVerse" on all platforms. Neither the Windows nor the Linux icon has been checked on a real host.
 
 The redesigned preview uses canvas `#141626`, panel `#1d2032`, outline `#353b53`, action `#73d5fb`, and violet accent `#c2a7f5`. Text and controls use Flutter's dark color scheme. Use native/system text rather than requiring a font download. A light theme is a future task, not an implemented feature.
 
