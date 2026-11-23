@@ -167,11 +167,12 @@ void main() {
     expect(find.text('Largest folders in this scope'), findsOneWidget);
     expect(find.text('Storage by file type'), findsOneWidget);
     // Below the fold inside the page's own scroll view.
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -3000));
+    await tester.drag(
+      find.byType(CustomScrollView).first,
+      const Offset(0, -3000),
+    );
     await tester.pumpAndSettle();
-    // TODO(track B): restore the semantics-label check once the Folders
-    // tab is rebuilt with lazy slivers.
-    expect(find.text('Documents', skipOffstage: false), findsOneWidget);
+    expect(find.bySemanticsLabel('Documents, 2.0 KiB, 1 file'), findsOneWidget);
     expect(find.textContaining('Folder totals are partial'), findsOneWidget);
   });
 
@@ -179,7 +180,7 @@ void main() {
     await pumpApp(tester, FakeFolderScanner());
     await openSection(tester, 'Storage');
     expect(find.text('No files to review yet'), findsOneWidget);
-    await tester.tap(find.text('Go to Smart Scan'));
+    await tester.tap(find.text('Go to Home'));
     await tester.pumpAndSettle();
     expect(find.text('Choose and scan folder'), findsOneWidget);
   });
@@ -244,11 +245,11 @@ void main() {
     await openSection(tester, 'Storage');
     await tester.tap(find.text('Duplicates'));
     await tester.pumpAndSettle();
-    expect(find.text('Matching was not part of this scan'), findsOneWidget);
-    await tester.tap(find.text('Turn on and scan again'));
+    expect(find.text('Find files with identical contents'), findsOneWidget);
+    await tester.tap(find.text('Find duplicates'));
     await tester.pumpAndSettle();
     expect(scanner.scans, 2);
-    expect(find.text('Matching groups: 1'), findsOneWidget);
+    expect(find.textContaining('1 group of duplicates'), findsOneWidget);
     expect(find.text('chosen/a.txt'), findsOneWidget);
     expect(find.text('chosen/b.txt'), findsOneWidget);
     expect(find.textContaining('Delete'), findsNothing);

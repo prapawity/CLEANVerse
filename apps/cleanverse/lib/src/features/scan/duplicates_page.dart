@@ -11,7 +11,13 @@ import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/features/scan/needs_scan.dart';
 
-/// Exact-content matches. Review only; no removal or space estimates.
+/// Groups shown at first and added by each "Show more".
+const duplicateGroupPageSize = 50;
+
+/// Paths listed inside one expanded group.
+const _pathsPerGroup = 20;
+
+/// Exact-content matches, with removal of user-selected extra copies.
 class DuplicatesPage extends StatefulWidget {
   const DuplicatesPage({
     super.key,
@@ -27,8 +33,11 @@ class DuplicatesPage extends StatefulWidget {
 
 class _DuplicatesPageState extends State<DuplicatesPage> {
   final Set<String> selected = {};
+
+  /// Group keys (first path) the user expanded or collapsed explicitly.
+  final Map<String, bool> _expanded = {};
+  int shown = duplicateGroupPageSize;
   FolderScanViewModel get model => widget.model;
-  ValueChanged<Section> get onNavigate => widget.onNavigate;
 
   /// At least one copy in every group must stay unselected.
   bool canSelect(List<LargeFile> group, LargeFile file) =>
@@ -37,7 +46,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
 
   void selectAllButFirst(List<List<LargeFile>> groups) => setState(() {
     for (final group in groups) {
-      for (final file in group.skip(1)) {
+      for (final file in group.skip(1).take(_pathsPerGroup - 1)) {
         selected.add(file.path);
       }
     }
@@ -81,37 +90,26 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: model,
     builder: (context, _) {
-      const header = PageHeader(
-        title: 'Duplicates',
-        subtitle: 'Files with identical contents in this scope.',
-      );
       final gate = needsScan(
         model,
-        onNavigate,
+        widget.onNavigate,
         icon: Icons.file_copy_outlined,
-        title: 'No matching files checked yet',
+        title: 'No duplicates checked yet',
       );
-      if (gate != null) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [header, gate],
-        );
-      }
+      if (gate != null) return StorageScroll(header: [gate]);
       if (!model.findDuplicates) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            header,
+        return StorageScroll(
+          header: [
             EmptyState(
               icon: Icons.file_copy_outlined,
-              title: 'Matching was not part of this scan',
+              title: 'Find files with identical contents',
               message:
-                  'Turn on matching to compare file contents locally with SHA-256. '
-                  'This reads every candidate file and can take a while.',
-              action: FilledButton.icon(
-                onPressed: () => model.enableAndRescan(duplicates: true),
-                icon: const Icon(Icons.refresh_rounded, size: 19),
-                label: const Text('Turn on and scan again'),
+                  'Scans ${displayName(model.root!)} again and compares file contents on this computer. Large folders can take a while.',
+              action: FilledButton(
+                onPressed: model.busy
+                    ? null
+                    : () => model.enableAndRescan(duplicates: true),
+                child: const Text('Find duplicates'),
               ),
             ),
           ],
@@ -123,139 +121,169 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
           (a, b) =>
               (b.first.bytes * b.length).compareTo(a.first.bytes * a.length),
         );
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          header,
+      final count = groups.length < shown ? groups.length : shown;
+      final collapseByDefault = groups.length > 3;
+      final extraBytes = groups.fold<int>(
+        0,
+        (s, g) => s + g.first.bytes * (g.length - 1),
+      );
+      final selectedBytes = [
+        for (final g in groups)
+          for (final f in g)
+            if (selected.contains(f.path)) f.bytes,
+      ].fold<int>(0, (s, b) => s + b);
+      return StorageScroll(
+        header: [
           Text(
-            'Matching groups: ${groups.length}',
+            groups.isEmpty
+                ? 'No duplicates found'
+                : '${plural(groups.length, 'group')} of duplicates · up to ${formatBytes(extraBytes)} in extra copies',
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: CvSpace.sm),
-          const Callout(
-            'Matches have the same size and SHA-256 hash. Hard links may appear '
-            'separately; no space savings are estimated. Always keep at least one copy.',
+          const SizedBox(height: CvSpace.xs),
+          const Text(
+            'Copies have the same size and SHA-256 hash. Hard links share storage, so you may free less. One copy in each group is always kept.',
+            style: TextStyle(color: CvColors.muted, fontSize: 13),
           ),
           if (result.cancelled || result.skipped > 0)
-            const Callout(
-              'Some files were skipped or the scan was cancelled, so matches may be missing.',
-              tone: CalloutTone.caution,
-            ),
-          if (groups.isEmpty)
-            const EmptyState(
-              icon: Icons.check_circle_outline_rounded,
-              title: 'No matching files found',
-              message: 'No files in this scope had identical contents.',
-            )
-          else ...[
-            const Text(
-              'Showing up to 50 groups and 20 paths per group, largest first.',
-              style: TextStyle(color: CvColors.muted, fontSize: 13),
-            ),
-            const SizedBox(height: CvSpace.sm),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: model.busy
-                    ? null
-                    : () => selectAllButFirst(groups.take(50).toList()),
-                icon: const Icon(Icons.library_add_check_outlined),
-                label: const Text('Select all but one copy in each group'),
+            const Padding(
+              padding: EdgeInsets.only(top: CvSpace.sm),
+              child: Callout(
+                'Some files were skipped or the scan was cancelled, so matches may be missing.',
+                tone: CalloutTone.caution,
               ),
             ),
-            for (final group in groups.take(50))
-              _GroupCard(
+          if (groups.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: model.busy
+                    ? null
+                    : () => selectAllButFirst(groups.take(count).toList()),
+                child: const Text('Select all but one copy in each group'),
+              ),
+            ),
+        ],
+        slivers: [
+          SliverList.builder(
+            itemCount: count,
+            itemBuilder: (context, i) {
+              final group = groups[i];
+              final key = group.first.path;
+              return _Group(
                 group: group,
+                expanded: _expanded[key] ?? !collapseByDefault,
+                onToggle: () => setState(
+                  () =>
+                      _expanded[key] = !(_expanded[key] ?? !collapseByDefault),
+                ),
                 isSelected: (f) => selected.contains(f.path),
                 canSelect: (f) => !model.busy && canSelect(group, f),
                 onChanged: (f, value) => setState(
                   () => value ? selected.add(f.path) : selected.remove(f.path),
                 ),
-              ),
-            Container(
-              margin: const EdgeInsets.only(top: CvSpace.md),
-              padding: const EdgeInsets.all(CvSpace.lg),
-              decoration: BoxDecoration(
-                color: CvColors.raised,
-                borderRadius: BorderRadius.circular(CvRadius.md),
-                border: Border.all(color: CvColors.outline),
-              ),
-              child: Wrap(
-                spacing: CvSpace.lg,
-                runSpacing: CvSpace.sm,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.spaceBetween,
-                children: [
-                  Text(
-                    selected.isEmpty
-                        ? 'Select copies to remove'
-                        : '${plural(selected.length, 'copy', 'copies')} selected',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  FilledButton.icon(
-                    onPressed: selected.isEmpty || model.busy
-                        ? null
-                        : () => _remove(groups.take(50).toList()),
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    label: Text('Move to ${trashName()}'),
-                  ),
-                ],
+              );
+            },
+          ),
+          if (groups.length > count)
+            SliverToBoxAdapter(
+              child: ShowMoreButton(
+                remaining: groups.length - count,
+                onPressed: () =>
+                    setState(() => shown += duplicateGroupPageSize),
               ),
             ),
-          ],
         ],
+        bottomBar: groups.isEmpty
+            ? null
+            : SelectionBar(
+                summary: selected.isEmpty
+                    ? 'Select copies to remove'
+                    : '${plural(selected.length, 'copy', 'copies')} selected · ${formatBytes(selectedBytes)}',
+                actionLabel: 'Move to ${trashName()}…',
+                onAction: selected.isEmpty || model.busy
+                    ? null
+                    : () => _remove(groups),
+              ),
       );
     },
   );
 }
 
-class _GroupCard extends StatelessWidget {
-  const _GroupCard({
+class _Group extends StatelessWidget {
+  const _Group({
     required this.group,
+    required this.expanded,
+    required this.onToggle,
     required this.isSelected,
     required this.canSelect,
     required this.onChanged,
   });
   final List<LargeFile> group;
+  final bool expanded;
+  final VoidCallback onToggle;
   final bool Function(LargeFile) isSelected;
   final bool Function(LargeFile) canSelect;
   final void Function(LargeFile, bool) onChanged;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(CvSpace.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                iconForCategory(categoryForPath(group.first.path)),
-                color: CvColors.violet,
+  Widget build(BuildContext context) {
+    final name = p.basename(group.first.path);
+    final picked = group.where(isSelected).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(CvRadius.sm),
+          child: Semantics(
+            button: true,
+            expanded: expanded,
+            label: '$name, ${group.length} copies',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: CvSpace.sm),
+              child: Row(
+                children: [
+                  Icon(
+                    expanded
+                        ? Icons.expand_more_rounded
+                        : Icons.chevron_right_rounded,
+                    color: CvColors.muted,
+                  ),
+                  const SizedBox(width: CvSpace.sm),
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: CvSpace.sm),
+                  Flexible(
+                    child: Text(
+                      [
+                        '${group.length} × ${formatBytes(group.first.bytes)}',
+                        if (picked > 0) '$picked selected',
+                      ].join(' · '),
+                      textAlign: TextAlign.end,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: CvColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: CvSpace.md),
-              Expanded(
-                child: Text(
-                  p.basename(group.first.path),
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(width: CvSpace.sm),
-              Flexible(
-                child: Text(
-                  '${group.length} matching files · ${formatBytes(group.first.bytes)} each',
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(color: CvColors.muted, fontSize: 12),
-                ),
-              ),
-            ],
+            ),
           ),
-          const Divider(height: 20),
-          for (final file in group.take(20))
+        ),
+        if (expanded) ...[
+          for (final file in group.take(_pathsPerGroup))
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
+              padding: const EdgeInsets.only(left: CvSpace.lg),
               child: Row(
                 children: [
                   Checkbox(
@@ -265,23 +293,29 @@ class _GroupCard extends StatelessWidget {
                         : null,
                     semanticLabel: 'Select copy ${file.path}',
                   ),
-                  const SizedBox(width: CvSpace.xs),
-                  Expanded(child: SelectableText(file.path)),
+                  Expanded(child: PathLine(file.path)),
                   if (!isSelected(file) && !canSelect(file))
                     const Padding(
                       padding: EdgeInsets.only(left: CvSpace.sm),
-                      child: StatusChip('Kept', color: CvColors.mint),
+                      child: Text(
+                        'Kept',
+                        style: TextStyle(color: CvColors.mint, fontSize: 12),
+                      ),
                     ),
                 ],
               ),
             ),
-          if (group.length > 20)
-            Text(
-              '${group.length - 20} more not shown',
-              style: const TextStyle(color: CvColors.muted, fontSize: 12),
+          if (group.length > _pathsPerGroup)
+            Padding(
+              padding: const EdgeInsets.only(left: 56, bottom: CvSpace.sm),
+              child: Text(
+                '${group.length - _pathsPerGroup} more copies not shown',
+                style: const TextStyle(color: CvColors.muted, fontSize: 12),
+              ),
             ),
         ],
-      ),
-    ),
-  );
+        const Divider(height: 1, color: CvColors.outlineSoft),
+      ],
+    );
+  }
 }

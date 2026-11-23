@@ -3,7 +3,10 @@
 import 'package:flutter/material.dart';
 
 /// Storage area: biggest files, folders and duplicates as tabs.
-/// Foundation version wrapping the existing pages (track B refines it).
+///
+/// Each tab page owns its scrolling (lazy slivers, pinned selection bar), so
+/// pass the pages directly, not wrapped in another scroll view. A wrapped
+/// page still works but loses laziness.
 class StoragePage extends StatefulWidget {
   const StoragePage({
     super.key,
