@@ -14,9 +14,13 @@ class SettingsPage extends StatelessWidget {
     super.key,
     required this.settings,
     required this.updates,
+    this.onTrySample,
   });
   final AppSettings settings;
   final UpdateViewModel updates;
+
+  /// Opens the sample-data walkthrough (formerly the Example scan menu).
+  final VoidCallback? onTrySample;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -28,6 +32,15 @@ class SettingsPage extends StatelessWidget {
           title: 'Settings',
           subtitle: 'Updates and app information.',
         ),
+        if (onTrySample != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: CvSpace.lg),
+            child: OutlinedButton.icon(
+              onPressed: onTrySample,
+              icon: const Icon(Icons.science_outlined),
+              label: const Text('Try with sample data'),
+            ),
+          ),
         Panel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -325,3 +325,81 @@ class Swatch extends StatelessWidget {
     ),
   );
 }
+
+/// Page body that owns its scrolling. The shell gives each page the full
+/// content area; pages put lazy lists in [slivers] and keep selection
+/// actions in [bottomBar], which stays visible. Content is centered at
+/// [maxWidth] with responsive gutters.
+class PageScroll extends StatefulWidget {
+  const PageScroll({
+    super.key,
+    this.children = const [],
+    this.slivers = const [],
+    this.bottomBar,
+    this.maxWidth = 1080,
+  });
+
+  /// Simple, short content placed before [slivers].
+  final List<Widget> children;
+  final List<Widget> slivers;
+  final Widget? bottomBar;
+  final double maxWidth;
+
+  @override
+  State<PageScroll> createState() => _PageScrollState();
+}
+
+class _PageScrollState extends State<PageScroll> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final wide = constraints.maxWidth >= 900;
+      final gutter = wide ? 40.0 : 16.0;
+      final side = ((constraints.maxWidth - widget.maxWidth) / 2).clamp(
+        gutter,
+        double.infinity,
+      );
+      return Column(
+        children: [
+          Expanded(
+            child: Scrollbar(
+              controller: _controller,
+              child: CustomScrollView(
+                controller: _controller,
+                slivers: [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(side, wide ? 32 : 20, side, 0),
+                    sliver: SliverList.list(children: widget.children),
+                  ),
+                  for (final sliver in widget.slivers)
+                    SliverPadding(
+                      padding: EdgeInsets.symmetric(horizontal: side),
+                      sliver: sliver,
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 48)),
+                ],
+              ),
+            ),
+          ),
+          if (widget.bottomBar != null)
+            Container(
+              decoration: const BoxDecoration(
+                color: CvColors.sidebar,
+                border: Border(top: BorderSide(color: CvColors.outlineSoft)),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: side, vertical: 12),
+              child: widget.bottomBar,
+            ),
+        ],
+      );
+    },
+  );
+}

@@ -24,7 +24,7 @@ Widget? needsScan(
       title: title,
       message: 'Run a scan first. Results from one scan appear in every review area.',
       action: FilledButton.icon(
-        onPressed: () => onNavigate(Section.smartScan),
+        onPressed: () => onNavigate(Section.home),
         icon: const Icon(Icons.radar_rounded, size: 19),
         label: const Text('Go to Smart Scan'),
       ),

@@ -11,6 +11,8 @@ import 'package:cleanverse/src/data/protection.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_page.dart';
 import 'package:cleanverse/src/data/scan_history.dart';
 import 'package:cleanverse/src/features/uninstall/uninstall_page.dart';
+import 'package:cleanverse/src/features/storage/storage_page.dart';
+import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/features/uninstall/uninstall_view_model.dart';
 import 'package:cleanverse/src/features/cleanup/full_disk_access_banner.dart';
 import 'package:cleanverse/src/features/developer/developer_page.dart';
@@ -27,15 +29,19 @@ import 'package:cleanverse/src/app/theme.dart';
 /// Workspace areas. One scan feeds every review area, similar to the
 /// scan → summary → review flow used by mainstream storage tools.
 enum Section {
-  smartScan('Smart Scan', Icons.radar_rounded),
+  home('Home', Icons.home_outlined),
   cleanup('Clean up', Icons.cleaning_services_outlined),
-  spaceLens('Space Lens', Icons.donut_large_rounded),
-  largeFiles('Large & old files', Icons.inventory_outlined),
-  duplicates('Duplicates', Icons.file_copy_outlined),
+  storage('Storage', Icons.pie_chart_outline_rounded),
+  apps('Apps', Icons.apps_rounded),
   developer('Developer', Icons.code_rounded),
-  uninstall('Uninstaller', Icons.delete_sweep_outlined),
-  example('Example scan', Icons.science_outlined),
-  settings('Settings', Icons.settings_outlined);
+  settings('Settings', Icons.settings_outlined),
+
+  // Not in the menu: opened from other pages (old routes, kept until the
+  // redesign tracks remove them).
+  spaceLens('Folders', Icons.donut_large_rounded),
+  largeFiles('Biggest files', Icons.inventory_outlined),
+  duplicates('Duplicates', Icons.file_copy_outlined),
+  example('Sample data', Icons.science_outlined);
 
   const Section(this.label, this.icon);
   final String label;
@@ -123,13 +129,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Section section = Section.smartScan;
-  final _scrollController = ScrollController();
-
+  Section section = Section.home;
   void _go(Section value) {
     if (value == section) return;
     setState(() => section = value);
-    if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
 
   @override
@@ -141,12 +144,23 @@ class _HomeScreenState extends State<HomeScreen> {
     settings.dispose();
     growth.dispose();
     uninstall.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
+  /// Existing pages are plain columns; wrap them until each track moves
+  /// its page to [PageScroll] with lazy slivers.
+  Widget _legacy(Widget page) => PageScroll(children: [page]);
+
+  Widget _shellPage() => switch (section) {
+    Section.storage ||
+    Section.largeFiles ||
+    Section.spaceLens ||
+    Section.duplicates => _page(),
+    _ => _legacy(_page()),
+  };
+
   Widget _page() => switch (section) {
-    Section.smartScan => SmartScanPage(
+    Section.home => SmartScanPage(
       model: scan,
       onNavigate: _go,
       growth: growth,
@@ -158,20 +172,32 @@ class _HomeScreenState extends State<HomeScreen> {
       settings: settings,
       fullDiskAccess: Platform.isMacOS ? const FullDiskAccessBanner() : null,
     ),
-    Section.uninstall => UninstallPage(
+    Section.apps => UninstallPage(
       model: uninstall,
       supported: Platform.isMacOS,
     ),
-    Section.spaceLens => SpaceLensPage(model: scan, onNavigate: _go),
-    Section.largeFiles => LargeFilesPage(
-      model: scan,
-      onNavigate: _go,
-      settings: settings,
+    Section.storage ||
+    Section.largeFiles ||
+    Section.spaceLens ||
+    Section.duplicates => StoragePage(
+      initialTab: switch (section) {
+        Section.spaceLens => 1,
+        Section.duplicates => 2,
+        _ => 0,
+      },
+      files: _legacy(
+        LargeFilesPage(model: scan, onNavigate: _go, settings: settings),
+      ),
+      folders: _legacy(SpaceLensPage(model: scan, onNavigate: _go)),
+      duplicates: _legacy(DuplicatesPage(model: scan, onNavigate: _go)),
     ),
-    Section.duplicates => DuplicatesPage(model: scan, onNavigate: _go),
     Section.developer => DeveloperPage(model: scan, onNavigate: _go),
     Section.example => ExamplePage(model: example),
-    Section.settings => SettingsPage(settings: settings, updates: updates),
+    Section.settings => SettingsPage(
+      settings: settings,
+      updates: updates,
+      onTrySample: () => _go(Section.example),
+    ),
   };
 
   @override
@@ -206,28 +232,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           badges: _badges(scan),
                         ),
                       Expanded(
-                        child: Scrollbar(
-                          controller: _scrollController,
-                          child: SingleChildScrollView(
-                            controller: _scrollController,
-                            padding: EdgeInsets.fromLTRB(
-                              wide ? 40 : 16,
-                              wide ? 32 : 20,
-                              wide ? 40 : 16,
-                              48,
-                            ),
-                            child: Center(
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 1080,
-                                ),
-                                child: KeyedSubtree(
-                                  key: ValueKey(section),
-                                  child: _page(),
-                                ),
-                              ),
-                            ),
-                          ),
+                        child: KeyedSubtree(
+                          key: ValueKey(section),
+                          child: _shellPage(),
                         ),
                       ),
                     ],
@@ -247,9 +254,8 @@ Map<Section, String> _badges(FolderScanViewModel model) {
   final result = model.result;
   if (result == null || model.busy) return const {};
   return {
-    if (result.files.isNotEmpty) Section.largeFiles: '${result.files.length}',
-    if (model.findDuplicates) Section.duplicates: '${result.duplicates.length}',
-    if (model.findDevFolders) Section.developer: '${result.devFolders.length}',
+    if (model.findDevFolders && result.devFolders.isNotEmpty)
+      Section.developer: '${result.devFolders.length}',
   };
 }
 
@@ -312,13 +318,33 @@ class _Brand extends StatelessWidget {
   );
 }
 
-const _navGroups = [
-  ('Scan', [Section.smartScan, Section.cleanup]),
-  ('Review', [Section.spaceLens, Section.largeFiles, Section.duplicates]),
-  ('Tools', [Section.developer, Section.uninstall]),
-  ('Learn', [Section.example]),
-  ('App', [Section.settings]),
+/// Menu items. Apps is macOS only; Settings sits at the bottom.
+List<(String?, List<Section>)> get _navGroups => [
+  (
+    null,
+    [
+      Section.home,
+      Section.cleanup,
+      Section.storage,
+      if (Platform.isMacOS) Section.apps,
+    ],
+  ),
+  ('Pro tools', [Section.developer]),
 ];
+
+List<Section> get _navSections => [
+  for (final (_, items) in _navGroups) ...items,
+  Section.settings,
+];
+
+/// Menu item that represents [section] (hidden routes map to Storage).
+Section _navOwner(Section section) => switch (section) {
+  Section.largeFiles ||
+  Section.spaceLens ||
+  Section.duplicates => Section.storage,
+  Section.example => Section.settings,
+  _ => section,
+};
 
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
@@ -350,71 +376,38 @@ class _Sidebar extends StatelessWidget {
                   child: _Brand(),
                 ),
                 for (final (title, items) in _navGroups) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 14, 24, 6),
-                    child: Text(
-                      title.toUpperCase(),
-                      style: const TextStyle(
-                        color: CvColors.muted,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
+                  if (title != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 14, 24, 6),
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: CvColors.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
                   for (final item in items)
                     _NavItem(
                       section: item,
-                      selected: item == selected,
+                      selected: item == _navOwner(selected),
                       badge: badges[item],
                       onPressed: () => onSelected(item),
                     ),
                 ],
                 const Spacer(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: _PrivacyCard(),
+                _NavItem(
+                  section: Section.settings,
+                  selected: _navOwner(selected) == Section.settings,
+                  onPressed: () => onSelected(Section.settings),
                 ),
+                const SizedBox(height: 12),
               ],
             ),
           ),
         ),
       ),
-    ),
-  );
-}
-
-class _PrivacyCard extends StatelessWidget {
-  const _PrivacyCard();
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: const Color(0xff22283a),
-      borderRadius: BorderRadius.circular(CvRadius.md),
-      border: Border.all(color: const Color(0xff343d55)),
-    ),
-    child: const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.shield_outlined, size: 17, color: CvColors.mint),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Private by design',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 8),
-        Text(
-          'Scans stay on this device. Nothing is removed until you confirm.',
-          style: TextStyle(color: CvColors.muted, fontSize: 12, height: 1.45),
-        ),
-      ],
     ),
   );
 }
@@ -531,7 +524,7 @@ class _CompactNav extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          for (final item in Section.values)
+          for (final item in _navSections)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
@@ -541,7 +534,7 @@ class _CompactNav extends StatelessWidget {
                       ? item.label
                       : '${item.label} · ${badges[item]}',
                 ),
-                selected: item == selected,
+                selected: item == _navOwner(selected),
                 onSelected: (_) => onSelected(item),
               ),
             ),
