@@ -25,121 +25,132 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([settings, updates]),
-    builder: (context, _) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (context, _) => PageScroll(
+      maxWidth: 760,
       children: [
         const PageHeader(
           title: 'Settings',
-          subtitle: 'Updates and app information.',
+          subtitle:
+              'Updates, history and privacy. Everything stays on this device.',
         ),
-        if (onTrySample != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: CvSpace.lg),
-            child: OutlinedButton.icon(
+        if (onTrySample != null) ...[
+          const _Group(
+            'Sample data',
+            detail: 'See how results look without scanning your files.',
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton(
               onPressed: onTrySample,
-              icon: const Icon(Icons.science_outlined),
-              label: const Text('Try with sample data'),
+              child: const Text('Try with sample data'),
             ),
           ),
-        Panel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Updates', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(
-                'Current version: ${updates.version ?? '…'}',
-                style: const TextStyle(color: CvColors.muted),
-              ),
-              const SizedBox(height: CvSpace.md),
-              if (!updates.configured)
-                const Callout(
-                  'This build has no update signing key, so it does not check for updates. '
-                  'Official releases from GitHub include it.',
-                )
-              else ...[
-                Material(
-                  color: Colors.transparent,
-                  child: SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: settings.autoCheckUpdates,
-                    onChanged: settings.setAutoCheckUpdates,
-                    title: const Text('Check for updates automatically'),
-                    subtitle: const Text(
-                      'Once a day, from GitHub Releases. Nothing is downloaded without asking.',
-                    ),
+        ],
+        const _Group('Updates'),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current version: ${updates.version ?? '…'}',
+              style: const TextStyle(color: CvColors.muted),
+            ),
+            const SizedBox(height: CvSpace.md),
+            if (!updates.configured)
+              const Callout(
+                'This build has no update signing key, so it does not check for updates. '
+                'Official releases from GitHub include it.',
+              )
+            else ...[
+              Material(
+                color: Colors.transparent,
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: settings.autoCheckUpdates,
+                  onChanged: settings.setAutoCheckUpdates,
+                  title: const Text('Check for updates automatically'),
+                  subtitle: const Text(
+                    'Once a day, from GitHub Releases. Nothing is downloaded without asking.',
                   ),
                 ),
-                const SizedBox(height: CvSpace.sm),
-                UpdateStatusView(updates: updates),
-              ],
-            ],
-          ),
-        ),
-        const SectionTitle(
-          'Scan history',
-          detail: 'Off by default. Stored only on this computer.',
-        ),
-        Panel(
-          child: Material(
-            color: Colors.transparent,
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: settings.keepScanHistory,
-              onChanged: settings.setKeepScanHistory,
-              title: const Text('Keep scan history to show what grew'),
-              subtitle: const Text(
-                'Saves folder paths and sizes from each finished scan (no file names or contents) '
-                'in this app\'s data folder. Turning it off deletes the history.',
               ),
+              const SizedBox(height: CvSpace.sm),
+              UpdateStatusView(updates: updates),
+            ],
+          ],
+        ),
+        const _Group('Scan history'),
+        Material(
+          color: Colors.transparent,
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: settings.keepScanHistory,
+            onChanged: settings.setKeepScanHistory,
+            title: const Text('Keep scan history to show what grew'),
+            subtitle: const Text(
+              'Saves folder paths and sizes from each finished scan (no file names or contents) '
+              'in this app\'s data folder. Off by default. Turning it off deletes the history.',
             ),
           ),
         ),
-        const SectionTitle(
+        const _Group(
           'Ignore list',
           detail: 'These paths are never offered for cleanup or removed.',
         ),
-        Panel(
-          child: settings.ignoreList.paths.isEmpty
-              ? const Text(
-                  'Nothing ignored. Use the hide button next to an item to add it.',
-                  style: TextStyle(color: CvColors.muted),
-                )
-              : Column(
-                  children: [
-                    for (final path in settings.ignoreList.paths)
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.visibility_off_outlined,
-                            size: 18,
-                            color: CvColors.muted,
-                          ),
-                          const SizedBox(width: CvSpace.sm),
-                          Expanded(child: SelectableText(path)),
-                          TextButton(
-                            onPressed: () => settings.unignorePath(path),
-                            child: const Text('Remove'),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-        ),
-        const SectionTitle(
+        settings.ignoreList.paths.isEmpty
+            ? const Text(
+                'Nothing ignored. Use the hide button next to an item to add it.',
+                style: TextStyle(color: CvColors.muted),
+              )
+            : Column(
+                children: [
+                  for (final path in settings.ignoreList.paths)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.visibility_off_outlined,
+                          size: 18,
+                          color: CvColors.muted,
+                        ),
+                        const SizedBox(width: CvSpace.sm),
+                        Expanded(child: OneLinePath(path)),
+                        TextButton(
+                          onPressed: () => settings.unignorePath(path),
+                          child: const Text('Remove'),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+        const _Group(
           'Removal history',
           detail: 'Stored only on this device. Includes file paths.',
         ),
         _HistorySection(settings: settings),
-        const SectionTitle('Privacy'),
-        const Panel(
-          child: Text(
-            'Scans, paths and results stay on this device. CLEANVerse sends no telemetry. '
-            'The only network request is the optional update check to github.com.',
-          ),
+        const _Group('Privacy'),
+        const Text(
+          'Scans, paths and results stay on this device. CLEANVerse sends no telemetry. '
+          'The only network request is the optional update check to github.com.',
+          style: TextStyle(color: CvColors.muted, height: 1.5),
         ),
       ],
     ),
+  );
+}
+
+/// Section heading with a hairline above it; keeps Settings one calm page.
+class _Group extends StatelessWidget {
+  const _Group(this.title, {this.detail});
+  final String title;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SizedBox(height: CvSpace.md),
+      const Divider(height: 1, color: CvColors.outlineSoft),
+      SectionTitle(title, detail: detail),
+    ],
   );
 }
 
@@ -275,86 +286,84 @@ class _HistorySectionState extends State<_HistorySection> {
   }
 
   @override
-  Widget build(BuildContext context) => Panel(
-    child: FutureBuilder<List<LoggedOperation>>(
-      future: entries,
-      builder: (context, snapshot) {
-        final list = snapshot.data ?? const <LoggedOperation>[];
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const LinearProgressIndicator();
-        }
-        if (list.isEmpty) {
-          return const Text(
-            'No removals yet.',
-            style: TextStyle(color: CvColors.muted),
-          );
-        }
-        final freed = list.fold<int>(0, (s, e) => s + e.freedBytes);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: CvSpace.md,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  '${plural(list.length, 'entry', 'entries')} · ${formatBytes(freed)} freed permanently',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                TextButton.icon(
-                  onPressed: () => setState(() => entries = _load()),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Refresh'),
-                ),
-                TextButton.icon(
-                  onPressed: _clear,
-                  icon: const Icon(Icons.delete_sweep_outlined),
-                  label: const Text('Clear history'),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            for (final e in list.take(100))
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      e.mode == 'trash'
-                          ? Icons.restore_from_trash_outlined
-                          : Icons.delete_forever_outlined,
-                      size: 18,
-                      color: e.status == 'removed' || e.status == 'movedToTrash'
-                          ? CvColors.mint
-                          : CvColors.amber,
-                    ),
-                    const SizedBox(width: CvSpace.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${e.label} · ${_statusText(e)}',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          SelectableText(
-                            '${formatDate(e.time)} ${e.time.hour.toString().padLeft(2, '0')}:${e.time.minute.toString().padLeft(2, '0')} · ${e.path}',
-                            style: const TextStyle(
-                              color: CvColors.muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+  Widget build(BuildContext context) => FutureBuilder<List<LoggedOperation>>(
+    future: entries,
+    builder: (context, snapshot) {
+      final list = snapshot.data ?? const <LoggedOperation>[];
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const LinearProgressIndicator();
+      }
+      if (list.isEmpty) {
+        return const Text(
+          'No removals yet.',
+          style: TextStyle(color: CvColors.muted),
         );
-      },
-    ),
+      }
+      final freed = list.fold<int>(0, (s, e) => s + e.freedBytes);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: CvSpace.md,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                '${plural(list.length, 'entry', 'entries')} · ${formatBytes(freed)} freed permanently',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              TextButton.icon(
+                onPressed: () => setState(() => entries = _load()),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Refresh'),
+              ),
+              TextButton.icon(
+                onPressed: _clear,
+                icon: const Icon(Icons.delete_sweep_outlined),
+                label: const Text('Clear history'),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          for (final e in list.take(100))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    e.mode == 'trash'
+                        ? Icons.restore_from_trash_outlined
+                        : Icons.delete_forever_outlined,
+                    size: 18,
+                    color: e.status == 'removed' || e.status == 'movedToTrash'
+                        ? CvColors.mint
+                        : CvColors.amber,
+                  ),
+                  const SizedBox(width: CvSpace.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${e.label} · ${_statusText(e)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        OneLinePath(
+                          '${formatDate(e.time)} ${e.time.hour.toString().padLeft(2, '0')}:${e.time.minute.toString().padLeft(2, '0')} · ${e.path}',
+                          style: const TextStyle(
+                            color: CvColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    },
   );
 }
 

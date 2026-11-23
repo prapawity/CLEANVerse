@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 class FakeFolderScanner implements FolderScanner {
   int scans = 0;
+  final paths = <String>[];
   @override
   Future<FolderScanResult> scan(
     String path,
@@ -29,6 +30,7 @@ class FakeFolderScanner implements FolderScanner {
     void Function(ScanProgress)? onProgress,
   }) async {
     scans++;
+    paths.add(path);
     return FolderScanResult(
       [
         LargeFile(
@@ -91,6 +93,7 @@ Future<void> pumpApp(
   WidgetTester tester,
   FolderScanner scanner, {
   Size size = const Size(1400, 1000),
+  CleanupViewModel? cleanup,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -101,6 +104,8 @@ Future<void> pumpApp(
       repository: DemoScanRepository(),
       scanner: scanner,
       pickFolder: () async => 'chosen',
+      homeFolder: () => 'home',
+      cleanup: cleanup ?? CleanupViewModel(loader: () async => const []),
     ),
   );
 }
@@ -125,15 +130,16 @@ void main() {
   ) async {
     final scanner = PendingFolderScanner();
     await pumpApp(tester, scanner);
-    await tester.tap(find.text('Choose and scan folder'));
+    await tester.tap(find.text('Scan now'));
     await tester.pump();
+    expect(find.text('Scanning…'), findsOneWidget);
     expect(find.text('Comparing files: 2 of 4 checked.'), findsOneWidget);
-    await tester.tap(find.text('Cancel scan'));
+    await tester.tap(find.text('Cancel'));
     await tester.pump();
     expect(find.text('Stopping the scan…'), findsOneWidget);
     scanner.completion.complete(const FolderScanResult([], 0, true));
     await tester.pumpAndSettle();
-    expect(find.text('Scan cancelled. Results are partial.'), findsOneWidget);
+    expect(find.textContaining('results are partial'), findsOneWidget);
   });
 
   testWidgets('narrow screen supports enlarged text without overflow', (
@@ -144,25 +150,77 @@ void main() {
     await pumpApp(tester, FakeFolderScanner(), size: const Size(375, 812));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.ensureVisible(find.text('Choose and scan folder'));
+    await tester.ensureVisible(find.text('Scan now'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Choose and scan folder'));
+    await tester.tap(find.text('Scan now'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Scan summary'), findsOneWidget);
+    expect(find.text('Your biggest files'), findsOneWidget);
   });
 
-  testWidgets('summary links each category to its review page', (tester) async {
-    await pumpApp(tester, FakeFolderScanner());
-    await tester.tap(find.text('Choose and scan folder'));
+  testWidgets('700 px window with enlarged text does not overflow', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpApp(tester, FakeFolderScanner(), size: const Size(700, 700));
     await tester.pumpAndSettle();
-    expect(find.text('Scan summary'), findsOneWidget);
-    expect(find.text('Folder: chosen'), findsOneWidget);
-    expect(find.textContaining('Results may be incomplete'), findsOneWidget);
-    expect(find.text('1 file · 80.0 MiB'), findsOneWidget);
-    expect(find.text('Not included'), findsNWidgets(2));
-    // Tiles are ordered Space Lens, Large & old, Duplicates, Developer.
-    await tester.tap(find.text('Review').first);
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.text('Scan now'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan now'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Your biggest files'), findsOneWidget);
+    await tester.ensureVisible(find.text('Settings').first);
+    await openSection(tester, 'Settings');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('scan now uses the home folder without a picker', (tester) async {
+    final scanner = FakeFolderScanner();
+    var junkChecks = 0;
+    await pumpApp(
+      tester,
+      scanner,
+      cleanup: CleanupViewModel(
+        loader: () async {
+          junkChecks++;
+          return const [];
+        },
+      ),
+    );
+    expect(find.text('Scan now'), findsOneWidget);
+    expect(find.text('Choose another folder…'), findsOneWidget);
+    // The old options panel is gone from the first screen.
+    expect(find.text('Find matching files'), findsNothing);
+    await tester.tap(find.text('Scan now'));
+    await tester.pumpAndSettle();
+    expect(scanner.paths, ['home']);
+    expect(junkChecks, 1);
+    expect(find.textContaining('in your home folder'), findsOneWidget);
+    expect(find.text('80.0 MiB'), findsOneWidget);
+    expect(find.text('Developer storage'), findsOneWidget);
+    // Nothing is found in junk, so no junk finding is shown.
+    expect(find.text('Junk you can clean up'), findsNothing);
+    expect(find.text('Scan again'), findsOneWidget);
+    expect(find.text('Change folder'), findsOneWidget);
+    await tester.tap(find.text('Change folder'));
+    await tester.pumpAndSettle();
+    expect(scanner.paths, ['home', 'chosen']);
+  });
+
+  testWidgets('findings link to their review pages', (tester) async {
+    await pumpApp(tester, FakeFolderScanner());
+    await tester.tap(find.text('Scan now'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('could not be read'), findsOneWidget);
+    expect(find.text('1 file of 50 MiB or more.'), findsOneWidget);
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+    expect(find.text('Developer folders: 2'), findsOneWidget);
+    await openSection(tester, 'Storage');
+    await tester.tap(find.text('Folders'));
     await tester.pumpAndSettle();
     expect(find.text('Largest folders in this scope'), findsOneWidget);
     expect(find.text('Storage by file type'), findsOneWidget);
@@ -181,7 +239,7 @@ void main() {
     expect(find.text('No files to review yet'), findsOneWidget);
     await tester.tap(find.text('Go to Smart Scan'));
     await tester.pumpAndSettle();
-    expect(find.text('Choose and scan folder'), findsOneWidget);
+    expect(find.text('Scan now'), findsOneWidget);
   });
 
   testWidgets('large files filter by size and age', (tester) async {
@@ -224,6 +282,8 @@ void main() {
     await pumpApp(tester, FakeFolderScanner());
     await tester.tap(find.text('Settings').first);
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(find.text('Try with sample data'));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('Try with sample data'));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.textContaining('example data only'), findsOneWidget);
@@ -239,7 +299,7 @@ void main() {
   ) async {
     final scanner = FakeFolderScanner();
     await pumpApp(tester, scanner);
-    await tester.tap(find.text('Choose and scan folder'));
+    await tester.tap(find.text('Scan now'));
     await tester.pumpAndSettle();
     await openSection(tester, 'Storage');
     await tester.tap(find.text('Duplicates'));
@@ -258,9 +318,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, FakeFolderScanner());
-    await tester.tap(find.text('Find developer folders'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Choose and scan folder'));
+    await tester.tap(find.text('Scan now'));
     await tester.pumpAndSettle();
     await openSection(tester, 'Developer');
     expect(find.text('Developer folders: 2'), findsOneWidget);

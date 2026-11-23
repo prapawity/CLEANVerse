@@ -1040,9 +1040,16 @@ class LocalFolderScanner implements FolderScanner {
 }
 
 class FolderScanViewModel extends ChangeNotifier {
-  FolderScanViewModel(this.scanner, this.pickFolder);
+  FolderScanViewModel(
+    this.scanner,
+    this.pickFolder, {
+    String? Function()? homeFolder,
+  }) : homeFolder = homeFolder ?? defaultHomeFolder;
   final FolderScanner scanner;
   final Future<String?> Function() pickFolder;
+
+  /// The default scope for [startDefault]: the user's home folder.
+  final String? Function() homeFolder;
 
   /// Called after a scan of a folder finishes without being cancelled.
   void Function(String root, FolderScanResult result)? onScanCompleted;
@@ -1149,7 +1156,25 @@ class FolderScanViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> start() async {
+  /// Scans the user's home folder without asking for a folder. Developer
+  /// folder detection is on; duplicate matching is left out (slow).
+  Future<void> startDefault() async {
+    if (busy) return;
+    final home = homeFolder();
+    if (home == null || home.isEmpty) {
+      error = 'Could not find your home folder. Choose a folder instead.';
+      notifyListeners();
+      return;
+    }
+    findDevFolders = true;
+    findDuplicates = false;
+    await _start(() async => home);
+  }
+
+  /// Asks for a folder, then scans it.
+  Future<void> start() => _start(pickFolder);
+
+  Future<void> _start(Future<String?> Function() choose) async {
     if (busy) return;
     busy = true;
     _cancelled = false;
@@ -1161,7 +1186,7 @@ class FolderScanViewModel extends ChangeNotifier {
     _selectedCleanupPaths.clear();
     notifyListeners();
     try {
-      final selected = await pickFolder();
+      final selected = await choose();
       if (_disposed || _cancelled || selected == null) return;
       root = selected;
       notifyListeners();
@@ -1301,6 +1326,12 @@ class FolderScanViewModel extends ChangeNotifier {
     _cancelled = true;
     super.dispose();
   }
+}
+
+/// The current user's home folder (HOME, or USERPROFILE on Windows).
+String? defaultHomeFolder() {
+  final env = Platform.environment;
+  return env['HOME'] ?? env['USERPROFILE'];
 }
 
 Future<String?> chooseFolder() =>
