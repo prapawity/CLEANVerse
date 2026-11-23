@@ -4,7 +4,19 @@ Status: initial implementation; subject to refinement and accessibility testing.
 
 ## Brand reference
 
-GITVerse by PRAPAWITY uses a ringed-planet mark, blue/violet accents, Catppuccin-inspired surfaces and system-oriented typography. CLEANVerse adopts the family palette while using its own cleaning-brush mark, with a subtle sweep inspired by [GITVerse](https://github.com/prapawity/GITVerse-by-PRAPAWITY). The brush is a provisional proposal used in the app and Windows icon, not an approved final identity. The earlier GITVerse asset and its MIT license remain in the repository as a reference. Other platform icons have not yet been updated.
+GITVerse by PRAPAWITY uses a ringed-planet mark, blue/violet accents, Catppuccin-inspired surfaces and system-oriented typography. CLEANVerse adopts the family palette with its own mark. The earlier GITVerse asset and its MIT license remain in the repository as a reference; the earlier "Orbit Brush" (`assets/brand/cleanverse-brush.svg`) is kept as history.
+
+### App icon: "Swept Orbit" (current design, subject to the owner's approval)
+
+A planet on a dark squircle tile, half dusty (muted violet with dust specks) and half clean (bright violet `#c2a7f5`), divided by a cyan `#73d5fb` orbit that sweeps across its face and ends in a bright leading particle. The orbit nods to GITVerse's ringed planet; the dusty-to-clean split says "cleanup" without a trash can, broom or sparkle, and is not derived from CleanMyMac or any other product's artwork. The tile follows macOS Big Sur+ grammar: about 10% transparent margin (824 px tile on a 1024 canvas), a top-lit gradient from `#2a2d45` to canvas `#141626`, a faint rim and a soft stacked shadow. The 16 and 32 px sizes use a simplified variant (larger planet, flat colours, no dust or tail fade, lighter dusty half) so the split and orbit stay legible.
+
+Files (in `apps/cleanverse/`):
+- `assets/brand/cleanverse-icon.svg`: master, 1024 canvas, used for 64 px and up.
+- `assets/brand/cleanverse-icon-small.svg`: simplified 16/32 px variant.
+- `assets/brand/cleanverse-mark.svg`: flat mark on a transparent background; rendered to `cleanverse-mark.png` (40 px) with `2.0x/` and `3.0x/` variants for the in-app `_Brand` logo.
+- `macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_*.png` (16 to 1024) and `windows/runner/resources/app_icon.ico` (16, 24, 32, 48, 64, 256) are renders of the SVGs above.
+
+Linux has no icon wired yet: it requires a runtime `gtk_window_set_icon` or a desktop-entry install step, which is not set up. The Windows icon has not been checked on a Windows host.
 
 The redesigned preview uses canvas `#141626`, panel `#1d2032`, outline `#353b53`, action `#73d5fb`, and violet accent `#c2a7f5`. Text and controls use Flutter's dark color scheme. Use native/system text rather than requiring a font download. A light theme is a future task, not an implemented feature.
 
