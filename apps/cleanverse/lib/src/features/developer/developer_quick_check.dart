@@ -1,12 +1,13 @@
 import 'dart:io';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show listEquals;
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
-import 'desktop_scan.dart';
+import 'package:cleanverse/src/features/developer/tool_commands_panel.dart';
+import 'package:cleanverse/src/features/developer/docker_panel.dart';
+import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 
 /// Checks known locations only. It does not traverse, calculate sizes or delete.
 class DeveloperQuickCheck extends StatefulWidget {
@@ -27,46 +28,6 @@ class _DeveloperQuickCheckState extends State<DeveloperQuickCheck> {
   bool checked = false;
   int skipped = 0;
   List<DevFolder> found = [];
-  bool dockerBusy = false;
-  String? dockerResult;
-
-  Future<void> checkDocker() async {
-    setState(() {
-      dockerBusy = true;
-      dockerResult = null;
-    });
-    Process? process;
-    try {
-      process = await Process.start('docker', ['system', 'df']);
-      final stdoutFuture = process.stdout.transform(utf8.decoder).join();
-      final stderrFuture = process.stderr.transform(utf8.decoder).join();
-      final exitCode = await process.exitCode.timeout(
-        const Duration(seconds: 20),
-      );
-      final output = await stdoutFuture;
-      final error = await stderrFuture;
-      if (!mounted) return;
-      setState(() {
-        dockerResult = exitCode == 0
-            ? output
-            : 'Docker could not report usage. Check that the CLI and daemon are available.\n${error.length > 1500 ? error.substring(0, 1500) : error}';
-      });
-    } catch (_) {
-      process?.kill();
-      if (!mounted) return;
-      setState(() {
-        dockerResult =
-            'Docker is unavailable or did not respond within 20 seconds.';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          dockerBusy = false;
-        });
-      }
-    }
-  }
-
   @override
   void didUpdateWidget(covariant DeveloperQuickCheck oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -196,26 +157,8 @@ class _DeveloperQuickCheckState extends State<DeveloperQuickCheck> {
           style: TextStyle(color: Color(0xffb2bfd4), fontSize: 12, height: 1.4),
         ),
       ],
-      const SizedBox(height: 16),
-      const Text('Docker', style: TextStyle(fontWeight: FontWeight.w600)),
-      const Text(
-        'Checks disk usage with Docker CLI. This uses your active Docker context, which may connect to a remote daemon.',
-        style: TextStyle(color: Color(0xffb2bfd4), fontSize: 12, height: 1.4),
-      ),
-      const SizedBox(height: 8),
-      OutlinedButton.icon(
-        onPressed: widget.enabled && !dockerBusy ? checkDocker : null,
-        icon: const Icon(Icons.storage_outlined),
-        label: Text(dockerBusy ? 'Checking Docker…' : 'Check Docker usage'),
-      ),
-      if (dockerResult != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: SelectableText(
-            dockerResult!,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-          ),
-        ),
+      DockerPanel(enabled: widget.enabled),
+      ToolCommandsPanel(enabled: widget.enabled, windows: Platform.isWindows),
     ],
   );
 }

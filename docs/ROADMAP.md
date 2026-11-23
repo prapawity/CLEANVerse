@@ -24,3 +24,18 @@ Evaluate cleanup rules, persistence, subscriptions and cloud features independen
 
 A platform is supported only after its build, permissions, accessibility, failure modes and integration tests pass on named OS versions and devices. Store acceptance is not assumed. Pricing and minimum supported versions remain product decisions.
 
+## Market-informed priorities (2026-11-22)
+
+From the market gap analysis (CleanMyMac, DaisyDisk, StorageRadar, WizTree, WinDirStat, BleachBit, Czkawka, Mole, npkill, ClearDisk). Done: signed GitHub Releases auto-update, settings persistence, feature-based layout.
+
+- Done 2026-11-22: dry-run preview in every removal dialog, local removal history (Settings), ignore list enforced by the removal engine, git-status and 7-day activity guard on project folders, Docker status/start/prune via official commands.
+- Done 2026-11-23: per-item risk labels (Safe / Caution / Risky) in Clean up, with explanation tooltip, screen-reader text and a confirmation warning for Risky items.
+- Now: verify risk labels and the cleanup flow on real Windows, macOS and Linux builds.
+- Done 2026-11-23: official clean commands for Homebrew (`brew cleanup`, with `--dry-run` preview), npm (`npm cache clean --force`) and pub (`dart pub cache clean --force`) in Developer, each behind a confirmation showing the exact command. Verified read-only commands on macOS; clean commands only tested with fake runners.
+- Done 2026-11-23: macOS distribution decision (owner): direct distribution, App Sandbox removed so Clean up, Docker and tool commands can reach user caches; not eligible for the Mac App Store as-is. Optional Full Disk Access banner in Clean up (detects denied access by probing protected paths, opens System Settings, dismissible).
+- Done 2026-11-23: opt-in scan history (off by default) with a "What grew" card on the scan summary, comparing with the previous finished scan of the same folder. Stores folder paths and logical sizes only, last 30 scans, locally; turning it off deletes the file.
+- Done 2026-11-23: wider developer cache catalog (Yarn, pnpm, Bun, CocoaPods, Carthage, SwiftPM, Maven, NuGet, Go build, Composer, Deno, Playwright, Puppeteer, Hugging Face, JetBrains, VS Code, Electron, node-gyp). Per-user paths only; sources and unverified defaults listed in `DEVELOPER_STORAGE.md`. Tested with env maps and temporary fixtures only.
+- Done 2026-11-23: macOS app uninstaller (Tools → Uninstaller). Finds the app plus Library leftovers by bundle id, labels risk, selects nothing, moves to Trash only; system-wide items listed, not removed. Windows/Linux show an unsupported state.
+- Later: vendor-folder leftovers for the uninstaller (e.g. Application Support/Google/AndroidStudio*), scheduled checks and low-disk alerts with tray icon, similar-photo detection, cloud storage cleanup, CLI.
+- Done 2026-11-23: branching and release process (`RELEASING.md`): GitHub Flow with squash merges, SemVer tags, CI on all three desktop targets for every PR, Prepare-release workflow, pre-releases for `-beta` tags, optional macOS signing and notarization in the Release workflow.
+- Distribution: Developer ID signing with hardened runtime and notarization (required now that the sandbox is off), winget and Homebrew; avoid the Mac App Store sandbox for developer caches.

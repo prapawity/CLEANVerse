@@ -20,4 +20,4 @@ Apply this review to each change, proportionate to its impact. The owner has req
 
 ## Current state
 
-The Flutter screen is an early functional prototype using the initial direction in `VISUAL_DIRECTION.md`. Its desktop preview contains an example scan and a separate read-only folder scan. Mobile support, screen-reader use, native platform behavior, and broader accessibility validation remain unverified.
+The Flutter app is an early functional prototype using the initial direction in `VISUAL_DIRECTION.md` and the scan → summary → review flow in `PRODUCT_FLOW.md`. Navigation has separate Smart Scan, Space Lens, Large & old files, Duplicates, Developer and Example areas. The 2026-11-22 restructure was formatted with `dart format` but not compiled, analyzed or tested in the authoring environment; run CI before relying on it. Mobile support, screen-reader use, native platform behavior, and broader accessibility validation remain unverified.

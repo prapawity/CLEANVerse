@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:cleanverse/src/desktop_scan.dart';
+import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class CapturingScanner implements FolderScanner {
@@ -157,7 +157,7 @@ void main() {
     final mac = globalCacheCandidates(env, windows: false, macos: true);
     expect(
       mac.where((item) => item.category.startsWith('Xcode')),
-      hasLength(2),
+      hasLength(3),
     );
   });
 
@@ -341,6 +341,20 @@ void main() {
       )).duplicates.single,
       hasLength(2),
     );
+  });
+
+  test('finished scans are reported for history', () async {
+    final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+    addTearDown(() => root.delete(recursive: true));
+    final model = FolderScanViewModel(
+      CapturingScanner(),
+      () async => root.path,
+    );
+    addTearDown(model.dispose);
+    final reported = <String>[];
+    model.onScanCompleted = (path, _) => reported.add(path);
+    await model.start();
+    expect(reported, [root.path]);
   });
 
   test(

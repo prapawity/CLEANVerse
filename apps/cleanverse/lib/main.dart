@@ -2,7 +2,7 @@
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
-import 'src/app.dart';
-import 'src/demo_scan.dart';
+import 'package:cleanverse/src/app/app.dart';
+import 'package:cleanverse/src/features/example/demo_scan.dart';
 
 void main() => runApp(CleanVerseApp(repository: DemoScanRepository()));

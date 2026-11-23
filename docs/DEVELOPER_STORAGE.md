@@ -18,6 +18,34 @@ The scanner recognizes Gradle `caches` under `GRADLE_USER_HOME`, Cargo `registry
 
 Additional candidates include the pip cache (`PIP_CACHE_DIR`, `XDG_CACHE_HOME` on supported non-Windows versions, or platform default) and Go module cache (`GOMODCACHE`, first `GOPATH` entry, or default). Go can also persist settings via `go env -w`, and pip configuration or version differences can change its effective cache location; neither is inspected here. Invalid nonempty overrides are not replaced by default paths. Go module caches may contain private source or be needed offline.
 
+### Wider catalog (2026-11-23)
+
+All paths are inside the user's profile or come from an absolute environment override; a relative or invalid override (e.g. `GOCACHE=off`, `PLAYWRIGHT_BROWSERS_PATH=0`) removes the candidate instead of falling back. "User cache" below means `%LOCALAPPDATA%` on Windows, `~/Library/Caches` on macOS and `$XDG_CACHE_HOME` or `~/.cache` on Linux. Risk *review* = rebuildable (Clean up: Caution); *important* = `potentiallyImportant` (Clean up: Risky, defaults to Trash). Tool config files (`.yarnrc.yml`, `bunfig.toml`, `settings.xml`, `nuget.config`, `.puppeteerrc`, `go env -w`, IDE settings) are not read.
+
+| Entry | Override | Default | Risk | Verified |
+|---|---|---|---|---|
+| Yarn classic cache | `YARN_CACHE_FOLDER` | Win `%LOCALAPPDATA%\Yarn\Cache`, mac `~/Library/Caches/Yarn`, Linux user cache `/yarn` | review | Override yes; defaults **unverified** (docs only say "user directory") |
+| Yarn Berry global cache | `YARN_GLOBAL_FOLDER` | `~/.yarn/berry/cache` | review | `globalFolder` default yes; `cache` subfolder and env name inferred from docs' `YARN_` rule |
+| pnpm store | `PNPM_HOME`/store, `XDG_DATA_HOME`/pnpm/store | Win `%LOCALAPPDATA%\pnpm\store`, mac `~/Library/pnpm/store`, Linux `~/.local/share/pnpm/store` | review | Yes |
+| Bun install cache | `BUN_INSTALL_CACHE_DIR` | `~/.bun/install/cache` | review | Yes |
+| CocoaPods cache (mac) | `CP_CACHE_DIR` | `~/Library/Caches/CocoaPods` | review | Source code only; `CP_HOME_DIR` not handled |
+| Carthage cache (mac) | none | `~/Library/Caches/org.carthage.CarthageKit` | review | **Unverified** |
+| Swift PM cache (mac) | none | `~/Library/Caches/org.swift.swiftpm` | review | **Unverified**; Linux not added |
+| Maven local repository | none (settings.xml not read) | `~/.m2/repository` | important (holds `mvn install` output) | Purpose yes; default path **not on fetched page** |
+| NuGet global packages | `NUGET_PACKAGES` | `~/.nuget/packages` | review | Yes |
+| Go build cache | `GOCACHE` | user cache `/go-build` | review | Yes |
+| Composer cache | `COMPOSER_CACHE_DIR`, `COMPOSER_HOME`/cache | Win `%LOCALAPPDATA%\Composer`, Linux `$XDG_CACHE_HOME/composer` if set, else `~/.composer/cache` | review | Yes, except Composer's own XDG detection (e.g. `~/.cache/composer` without the variable) is not reproduced |
+| Deno cache | `DENO_DIR` | user cache `/deno` | review | Yes (mac/Linux docs); Windows from install docs |
+| Playwright browsers | `PLAYWRIGHT_BROWSERS_PATH` | user cache `/ms-playwright` | review | Yes |
+| Puppeteer browsers | `PUPPETEER_CACHE_DIR` | `~/.cache/puppeteer` | review | Default yes; env variable **unverified** |
+| Hugging Face hub cache | `HF_HUB_CACHE`, `HF_HOME`/hub, `XDG_CACHE_HOME`/huggingface/hub | `~/.cache/huggingface/hub` | important (large, costly re-download) | Yes; token in `HF_HOME` is outside the candidate |
+| JetBrains caches | none | user cache `/JetBrains` | important (may contain Local History, logs) | **Unverified** |
+| VS Code `CachedData`, `CachedExtensionVSIXs` | `XDG_CONFIG_HOME` (Linux) | Win `%APPDATA%\Code`, mac `~/Library/Application Support/Code`, Linux `~/.config/Code` | review | **Unverified** |
+| Electron download cache | `ELECTRON_CACHE` | Win `%LOCALAPPDATA%\electron\Cache`, else user cache `/electron` | review | **Unverified** |
+| node-gyp headers | none | Win `%LOCALAPPDATA%\node-gyp\Cache`, else user cache `/node-gyp` | review | **Unverified** |
+
+Gradle `caches` was already present. Unverified entries are labelled "Conventional location (not confirmed in tool documentation)" in the app. Sources: [pnpm store settings](https://pnpm.io/settings/store), [Bun cache](https://bun.sh/docs/install/cache), [Yarn classic cache](https://classic.yarnpkg.com/en/docs/cli/cache), [Yarn yarnrc](https://yarnpkg.com/configuration/yarnrc), [CocoaPods config.rb](https://github.com/CocoaPods/CocoaPods/blob/master/lib/cocoapods/config.rb), [Maven repositories](https://maven.apache.org/guides/introduction/introduction-to-repositories.html), [NuGet folders](https://learn.microsoft.com/en-us/nuget/consume-packages/managing-the-global-packages-and-cache-folders), [Go build cache](https://pkg.go.dev/cmd/go), [Composer CLI](https://getcomposer.org/doc/03-cli.md), [Deno installation](https://docs.deno.com/runtime/getting_started/installation/), [Playwright browsers](https://playwright.dev/docs/browsers), [Puppeteer configuration](https://pptr.dev/guides/configuration), [Hugging Face env variables](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables). Tested with env maps and temporary fixtures only; no real-host check of these paths.
+
 ## Why cleanup needs a separate design
 
 The current Developer Cleanup interface allows users to select discovered project folders and tool storage candidates and review an in-memory snapshot. Nothing is selected automatically. Review shows source, scope, observed logical sizes and possible impacts; Xcode archives and Simulator device data are flagged as potentially important, and all other candidates require review. These labels are not safety or ownership determinations. Selections are cleared when scan options, scope, or exclusions change. Moving to Trash is disabled, and no delete, restore, background cleanup, or persistent history capability exists.
