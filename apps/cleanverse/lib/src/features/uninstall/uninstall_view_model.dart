@@ -1,15 +1,37 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:cleanverse/src/data/removal.dart';
 import 'package:cleanverse/src/features/uninstall/app_catalog.dart';
 
+/// Measures a path in bytes. Replaceable in tests so no real I/O runs.
+typedef SizeMeasurer = Future<int> Function(String path);
+
+enum AppSort { name, size }
+
 /// Lists apps, finds one app's leftovers, and moves what the user selects
 /// to the Trash. Nothing is selected automatically.
 class UninstallViewModel extends ChangeNotifier {
-  UninstallViewModel({AppCatalog? catalog, this.trash})
-    : catalog = catalog ?? AppCatalog();
+  UninstallViewModel({
+    AppCatalog? catalog,
+    this.trash,
+    SizeMeasurer? measure,
+    this.sizeConcurrency = 3,
+  }) : catalog = catalog ?? AppCatalog(),
+       measure = measure ?? ((path) => measureBytes(path));
   final AppCatalog catalog;
   final TrashBackend? trash;
+  final SizeMeasurer measure;
+
+  /// How many app bundles are measured at once in the background.
+  final int sizeConcurrency;
+
+  /// Bundle sizes measured so far, by app path. Missing means "Measuring…".
+  final Map<String, int> appSizes = {};
+  bool measuringSizes = false;
+  AppSort sort = AppSort.name;
+  int _sizeRun = 0;
 
   bool loadingApps = false;
   bool loadingLeftovers = false;
@@ -27,13 +49,71 @@ class UninstallViewModel extends ChangeNotifier {
 
   List<InstalledApp> get visibleApps {
     final q = query.trim().toLowerCase();
-    return [
+    final list = [
       for (final a in apps ?? const <InstalledApp>[])
         if (q.isEmpty ||
             a.name.toLowerCase().contains(q) ||
             a.bundleId.toLowerCase().contains(q))
           a,
     ];
+    int byName(InstalledApp a, InstalledApp b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    if (sort == AppSort.size) {
+      // Measured apps first, biggest first; unmeasured keep name order.
+      list.sort((a, b) {
+        final sa = appSizes[a.path];
+        final sb = appSizes[b.path];
+        if (sa == null && sb == null) return byName(a, b);
+        if (sa == null) return 1;
+        if (sb == null) return -1;
+        final c = sb.compareTo(sa);
+        return c != 0 ? c : byName(a, b);
+      });
+    } else {
+      list.sort(byName);
+    }
+    return list;
+  }
+
+  void setSort(AppSort value) {
+    sort = value;
+    _notify();
+  }
+
+  /// Measures bundle sizes in the background, a few at a time, so the
+  /// list is usable straight away.
+  Future<void> _measureApps(List<InstalledApp> list) async {
+    final run = ++_sizeRun;
+    final queue = [
+      for (final a in list)
+        if (!appSizes.containsKey(a.path)) a,
+    ];
+    if (queue.isEmpty) return;
+    measuringSizes = true;
+    _notify();
+    var next = 0;
+    Future<void> worker() async {
+      while (!_disposed && run == _sizeRun && next < queue.length) {
+        final app = queue[next++];
+        int bytes;
+        try {
+          bytes = await measure(app.path);
+        } catch (_) {
+          bytes = 0;
+        }
+        if (_disposed || run != _sizeRun) return;
+        appSizes[app.path] = bytes;
+        _notify();
+      }
+    }
+
+    await Future.wait([
+      for (var i = 0; i < sizeConcurrency.clamp(1, 16); i++) worker(),
+    ]);
+    if (run == _sizeRun) {
+      measuringSizes = false;
+      _notify();
+    }
   }
 
   List<Leftover> get removable => [
@@ -70,6 +150,8 @@ class UninstallViewModel extends ChangeNotifier {
       loadingApps = false;
       _notify();
     }
+    final list = apps;
+    if (list != null && !_disposed) unawaited(_measureApps(list));
   }
 
   Future<void> open(InstalledApp app, {bool keepOutcomes = false}) async {
@@ -85,7 +167,13 @@ class UninstallViewModel extends ChangeNotifier {
       final found = await catalog.findLeftovers(app);
       final measured = <Leftover>[];
       for (final l in found) {
-        measured.add(l.withBytes(await measureBytes(l.path)));
+        int bytes;
+        try {
+          bytes = await measure(l.path);
+        } catch (_) {
+          bytes = 0;
+        }
+        measured.add(l.withBytes(bytes));
       }
       if (selectedApp != app) return;
       leftovers = measured;
@@ -168,6 +256,7 @@ class UninstallViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _sizeRun++;
     super.dispose();
   }
 }

@@ -155,21 +155,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  /// Existing pages are plain columns; wrap them until each track moves
-  /// its page to [PageScroll] with lazy slivers.
-  Widget _legacy(Widget page) => PageScroll(children: [page]);
-
-  Widget _shellPage() => switch (section) {
-    Section.storage ||
-    Section.largeFiles ||
-    Section.spaceLens ||
-    Section.duplicates ||
-    Section.home ||
-    Section.settings ||
-    Section.example => _page(),
-    _ => _legacy(_page()),
-  };
-
   Widget _page() => switch (section) {
     Section.home => HomePage(
       model: scan,
@@ -237,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: KeyedSubtree(
                           key: ValueKey(section),
-                          child: _shellPage(),
+                          child: _page(),
                         ),
                       ),
                     ],

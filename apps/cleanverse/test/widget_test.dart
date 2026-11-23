@@ -9,6 +9,7 @@ import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:cleanverse/src/features/developer/developer_page.dart';
 import 'package:cleanverse/src/features/developer/git_guard.dart';
 import 'package:cleanverse/src/features/scan/large_files_page.dart';
+import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
 
 import 'dart:async';
@@ -108,6 +109,25 @@ Future<void> pumpApp(
       cleanup: cleanup ?? CleanupViewModel(loader: () async => const []),
     ),
   );
+}
+
+/// Pumps one page that owns its scrolling, as the shell will host it.
+Future<void> pumpPage(
+  WidgetTester tester,
+  Widget page, {
+  Size size = const Size(1400, 1000),
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: buildCleanVerseTheme(),
+      home: Scaffold(body: page),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 /// Sidebar items come before page content in the tree.
@@ -218,7 +238,7 @@ void main() {
     expect(find.text('1 file of 50 MiB or more.'), findsOneWidget);
     await tester.tap(find.text('Review'));
     await tester.pumpAndSettle();
-    expect(find.text('Developer folders: 2'), findsOneWidget);
+    expect(find.text('Project folders · 1'), findsOneWidget);
     await openSection(tester, 'Storage');
     await tester.tap(find.text('Folders'));
     await tester.pumpAndSettle();
@@ -318,13 +338,16 @@ void main() {
   testWidgets('developer folder review shows detected category', (
     tester,
   ) async {
-    await pumpApp(tester, FakeFolderScanner());
-    await tester.tap(find.text('Scan now'));
-    await tester.pumpAndSettle();
-    await openSection(tester, 'Developer');
-    expect(find.text('Developer folders: 2'), findsOneWidget);
-    expect(find.text('Project folders'), findsOneWidget);
-    expect(find.text('Tool storage candidates'), findsOneWidget);
+    final model = FolderScanViewModel(
+      FakeFolderScanner(),
+      () async => 'chosen',
+    );
+    addTearDown(model.dispose);
+    model.setFindDevFolders(true);
+    await model.start();
+    await pumpPage(tester, DeveloperPage(model: model, onNavigate: (_) {}));
+    expect(find.text('Project folders · 1'), findsOneWidget);
+    expect(find.text('Tool caches · 1'), findsOneWidget);
     expect(find.textContaining('Node.js dependencies'), findsWidgets);
     expect(
       find.text('Project marker: chosen/project/package.json'),
@@ -342,18 +365,13 @@ void main() {
       find.textContaining('Sizes are logical bytes scanned'),
       findsOneWidget,
     );
-    await tester.ensureVisible(
-      find.bySemanticsLabel('Select Node.js dependencies for review'),
-    );
-    await tester.pumpAndSettle();
+    expect(find.text('Nothing selected'), findsOneWidget);
     await tester.tap(
       find.bySemanticsLabel('Select Node.js dependencies for review'),
     );
     await tester.pumpAndSettle();
-    expect(find.text('1 selected for review'), findsOneWidget);
-    await tester.ensureVisible(find.text('Review and clean'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Review and clean'));
+    expect(find.textContaining('1 folder selected'), findsOneWidget);
+    await tester.tap(find.text('Review and clean…'));
     await tester.pumpAndSettle();
     expect(find.text('Clean developer folders'), findsOneWidget);
     expect(find.text('Recommended for each item'), findsOneWidget);
@@ -363,24 +381,15 @@ void main() {
     expect(find.text('Clean developer folders'), findsNothing);
   });
 
-  testWidgets('clean up lists junk by group and selects nothing', (
+  testWidgets('clean up checks automatically and selects nothing', (
     tester,
   ) async {
     final cleanup = CleanupViewModel(loader: () async => const [], trash: null);
     addTearDown(cleanup.dispose);
-    tester.view.physicalSize = const Size(1400, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      CleanVerseApp(repository: DemoScanRepository(), cleanup: cleanup),
-    );
-    await openSection(tester, 'Clean up');
-    expect(find.text('Find junk'), findsOneWidget);
-    await tester.tap(find.text('Find junk'));
-    await tester.pumpAndSettle();
+    await pumpPage(tester, CleanupPage(model: cleanup, onNavigate: (_) {}));
     expect(find.text('Nothing to clean'), findsOneWidget);
-    expect(find.text('Select what to clean'), findsOneWidget);
+    expect(find.text('Clean safe junk…'), findsNothing);
+    expect(cleanup.selected, isEmpty);
   });
 
   testWidgets('risk chips show label and explanation', (tester) async {
