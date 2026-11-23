@@ -23,6 +23,7 @@ Scan summary (status chip, totals, skipped count)
  ├─ Space Lens ........ largest folders (Explore → rescan inside, Back) + file types
  ├─ Large & old files . 100 largest, filter 50 MiB+ / older than a year, sort by size or age
  ├─ Duplicates ........ SHA-256 groups; "Turn on and scan again" if not included
+ ├─ What grew ......... opt-in history; growth since the previous scan of this folder
  └─ Developer ......... quick check + project/tool candidates → select → review dialog
 Example scan ......... fixed sample data, never touches files
 ```

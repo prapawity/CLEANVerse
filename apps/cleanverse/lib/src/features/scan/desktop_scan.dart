@@ -817,6 +817,9 @@ class FolderScanViewModel extends ChangeNotifier {
   FolderScanViewModel(this.scanner, this.pickFolder);
   final FolderScanner scanner;
   final Future<String?> Function() pickFolder;
+
+  /// Called after a scan of a folder finishes without being cancelled.
+  void Function(String root, FolderScanResult result)? onScanCompleted;
   bool busy = false;
   bool pickingExclusion = false;
   bool _cancelled = false;
@@ -962,7 +965,10 @@ class FolderScanViewModel extends ChangeNotifier {
         }
       },
     );
-    if (!_disposed) result = scanned;
+    if (!_disposed) {
+      result = scanned;
+      if (!scanned.cancelled) onScanCompleted?.call(selected, scanned);
+    }
   }
 
   Future<void> openFolder(String selected) async {

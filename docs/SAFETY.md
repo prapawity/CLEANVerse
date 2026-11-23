@@ -41,3 +41,7 @@ Verified: unit tests with temporary fixtures, and a read-only junk check on Wind
 The owner chose direct distribution for macOS. The App Sandbox entitlement is removed from Debug and Release builds, so the app runs with the user's own file permissions (no elevation). Consequences: the Mac App Store is not a target as-is; every removal still goes through the confirmation and re-checks above; release builds need Developer ID signing, hardened runtime and notarization.
 
 Full Disk Access is optional. CLEANVerse detects that it is missing by listing or opening protected paths (TCC database, Safari, Mail) without keeping any contents, and shows a dismissible banner that opens System Settings. Granting it never selects or removes anything. Verified: the build has no sandbox entitlement and the check reports denied from a Terminal without access. Not yet verified: the granted path in the app itself, and real cleanup on macOS.
+
+## Scan history (2026-11-23)
+
+Opt-in, off by default. When on, each finished (not cancelled) scan saves its root, time, total and the largest folders' paths and logical sizes to `scan_history.json` in the app's data folder; no file names, hashes or contents. At most 30 scans are kept. Turning the setting off deletes the file. Nothing is uploaded. Comparisons with skipped folders are labelled approximate.

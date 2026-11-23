@@ -343,6 +343,20 @@ void main() {
     );
   });
 
+  test('finished scans are reported for history', () async {
+    final root = await Directory.systemTemp.createTemp('cleanverse_test_');
+    addTearDown(() => root.delete(recursive: true));
+    final model = FolderScanViewModel(
+      CapturingScanner(),
+      () async => root.path,
+    );
+    addTearDown(model.dispose);
+    final reported = <String>[];
+    model.onScanCompleted = (path, _) => reported.add(path);
+    await model.start();
+    expect(reported, [root.path]);
+  });
+
   test(
     'view model passes session exclusions and supports removing them',
     () async {

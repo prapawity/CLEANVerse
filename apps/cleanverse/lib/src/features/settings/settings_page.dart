@@ -64,6 +64,25 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
         const SectionTitle(
+          'Scan history',
+          detail: 'Off by default. Stored only on this computer.',
+        ),
+        Panel(
+          child: Material(
+            color: Colors.transparent,
+            child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: settings.keepScanHistory,
+              onChanged: settings.setKeepScanHistory,
+              title: const Text('Keep scan history to show what grew'),
+              subtitle: const Text(
+                'Saves folder paths and sizes from each finished scan (no file names or contents) '
+                'in this app\'s data folder. Turning it off deletes the history.',
+              ),
+            ),
+          ),
+        ),
+        const SectionTitle(
           'Ignore list',
           detail: 'These paths are never offered for cleanup or removed.',
         ),

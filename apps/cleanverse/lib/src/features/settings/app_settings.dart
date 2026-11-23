@@ -6,16 +6,20 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:cleanverse/src/data/protection.dart';
+import 'package:cleanverse/src/data/scan_history.dart';
 
 /// Small local preferences file (`settings.json` in the app support
-/// folder). Holds preferences and the user's ignore list; scan results
-/// are never stored.
+/// folder). Holds preferences and the user's ignore list. Scan results
+/// are stored only when the user turns on scan history.
 class AppSettings extends ChangeNotifier {
   AppSettings({Future<Directory> Function()? location})
     : _location = location ?? getApplicationSupportDirectory;
   final Future<Directory> Function() _location;
 
   bool autoCheckUpdates = true;
+
+  /// Opt-in. Off by default because folder paths are sensitive.
+  bool keepScanHistory = false;
   DateTime? lastUpdateCheck;
   String? skippedVersion;
   final IgnoreList ignoreList = IgnoreList();
@@ -24,6 +28,21 @@ class AppSettings extends ChangeNotifier {
   /// Removal history file next to the settings.
   Future<OperationLog> operationLog() async =>
       OperationLog(File(p.join((await _location()).path, 'history.jsonl')));
+
+  Future<ScanHistoryStore> scanHistory() async => ScanHistoryStore(
+    File(p.join((await _location()).path, 'scan_history.json')),
+  );
+
+  /// Turning history off deletes what was stored.
+  Future<void> setKeepScanHistory(bool value) async {
+    keepScanHistory = value;
+    if (!value) {
+      try {
+        await (await scanHistory()).clear();
+      } catch (_) {}
+    }
+    await save();
+  }
 
   Future<void> ignorePath(String path) async {
     if (ignoreList.add(path)) await save();
@@ -45,6 +64,7 @@ class AppSettings extends ChangeNotifier {
         final json = jsonDecode(await file.readAsString());
         if (json is Map<String, dynamic>) {
           autoCheckUpdates = json['autoCheckUpdates'] != false;
+          keepScanHistory = json['keepScanHistory'] == true;
           lastUpdateCheck = DateTime.tryParse('${json['lastUpdateCheck']}');
           final skipped = json['skippedVersion'];
           skippedVersion = skipped is String ? skipped : null;
@@ -70,6 +90,7 @@ class AppSettings extends ChangeNotifier {
       await file.writeAsString(
         jsonEncode({
           'autoCheckUpdates': autoCheckUpdates,
+          'keepScanHistory': keepScanHistory,
           'lastUpdateCheck': lastUpdateCheck?.toIso8601String(),
           'skippedVersion': skippedVersion,
           'ignoredPaths': ignoreList.paths,

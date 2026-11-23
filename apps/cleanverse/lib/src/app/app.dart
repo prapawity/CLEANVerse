@@ -9,6 +9,7 @@ import 'package:cleanverse/src/features/example/demo_scan.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:cleanverse/src/data/protection.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_page.dart';
+import 'package:cleanverse/src/data/scan_history.dart';
 import 'package:cleanverse/src/features/cleanup/full_disk_access_banner.dart';
 import 'package:cleanverse/src/features/developer/developer_page.dart';
 import 'package:cleanverse/src/features/scan/duplicates_page.dart';
@@ -90,11 +91,24 @@ class _HomeScreenState extends State<HomeScreen> {
   late final CleanupViewModel cleanup = widget.cleanup ?? CleanupViewModel();
   final AppSettings settings = AppSettings();
   late final UpdateViewModel updates = UpdateViewModel(settings: settings);
+  final ValueNotifier<ScanComparison?> growth = ValueNotifier(null);
+
+  Future<void> _recordScan(String root, FolderScanResult result) async {
+    growth.value = null;
+    if (!settings.keepScanHistory) return;
+    try {
+      final store = await settings.scanHistory();
+      growth.value = await store.record(ScanSnapshot.fromResult(root, result));
+    } catch (_) {
+      // No app data folder: history is unavailable.
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     activeIgnoreList = settings.ignoreList;
+    scan.onScanCompleted = _recordScan;
     settings.load().then((_) async {
       try {
         activeOperationLog = await settings.operationLog();
@@ -121,12 +135,18 @@ class _HomeScreenState extends State<HomeScreen> {
     if (widget.cleanup == null) cleanup.dispose();
     updates.dispose();
     settings.dispose();
+    growth.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   Widget _page() => switch (section) {
-    Section.smartScan => SmartScanPage(model: scan, onNavigate: _go),
+    Section.smartScan => SmartScanPage(
+      model: scan,
+      onNavigate: _go,
+      growth: growth,
+      historyEnabled: settings.keepScanHistory,
+    ),
     Section.cleanup => CleanupPage(
       model: cleanup,
       onNavigate: _go,

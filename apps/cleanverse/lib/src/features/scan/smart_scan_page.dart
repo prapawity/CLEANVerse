@@ -4,6 +4,8 @@ import 'dart:io';
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
+import 'package:cleanverse/src/data/scan_history.dart';
+import 'package:cleanverse/src/features/scan/what_grew_card.dart';
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:cleanverse/src/app/theme.dart';
@@ -22,13 +24,17 @@ class SmartScanPage extends StatelessWidget {
     super.key,
     required this.model,
     required this.onNavigate,
+    this.growth,
+    this.historyEnabled = false,
   });
   final FolderScanViewModel model;
   final ValueChanged<Section> onNavigate;
+  final ValueNotifier<ScanComparison?>? growth;
+  final bool historyEnabled;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: model,
+    listenable: Listenable.merge([model, ?growth]),
     builder: (context, _) {
       final result = model.result;
       return Column(
@@ -45,6 +51,13 @@ class SmartScanPage extends StatelessWidget {
               padding: const EdgeInsets.only(top: CvSpace.md),
               child: Callout(model.error!, tone: CalloutTone.caution),
             ),
+          if (result != null && !model.busy && growth != null) ...[
+            const SizedBox(height: CvSpace.md),
+            WhatGrewCard(
+              comparison: growth!.value,
+              historyEnabled: historyEnabled,
+            ),
+          ],
           if (result != null && !model.busy) ...[
             const SectionTitle('Scan options'),
             _Options(model: model, compact: true),
