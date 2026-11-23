@@ -261,6 +261,231 @@ List<DevFolder> globalCacheCandidates(
   final moduleCache = configured('GOMODCACHE')
       ? moduleOverride
       : (firstGoPath == null ? null : p.join(firstGoPath, 'pkg', 'mod'));
+  // Per-user cache root used by many tools: LOCALAPPDATA on Windows,
+  // ~/Library/Caches on macOS, XDG_CACHE_HOME or ~/.cache elsewhere.
+  // An invalid XDG_CACHE_HOME is not replaced by a default.
+  final userCache = windows
+      ? localAppData
+      : macos
+      ? (home == null ? null : p.join(home, 'Library', 'Caches'))
+      : xdgConfigured
+      ? xdgCache
+      : (home == null ? null : p.join(home, '.cache'));
+  const defaultSource =
+      'Default location; other tool configuration may override it';
+  const unverifiedSource =
+      'Conventional location (not confirmed in tool documentation); configuration may differ';
+  String? pick(String name, String? fallback) =>
+      configured(name) ? absolute(env[name]) : fallback;
+  String source(String name, String fallback) =>
+      configured(name) ? '$name environment variable' : fallback;
+  String? under(String? base, List<String> parts) =>
+      base == null ? null : p.joinAll([base, ...parts]);
+  final extra = <DevFolder>[];
+  void add(
+    String? path,
+    String category,
+    String note,
+    String locationSource, {
+    CleanupRisk risk = CleanupRisk.review,
+  }) {
+    if (path == null) return;
+    extra.add(
+      DevFolder(
+        path,
+        category,
+        note,
+        locationSource: locationSource,
+        risk: risk,
+      ),
+    );
+  }
+
+  add(
+    pick(
+      'YARN_CACHE_FOLDER',
+      windows
+          ? under(localAppData, ['Yarn', 'Cache'])
+          : macos
+          ? under(home, ['Library', 'Caches', 'Yarn'])
+          : under(userCache, ['yarn']),
+    ),
+    'Yarn classic package cache',
+    'Packages may need to be downloaded again; offline installs can stop working.',
+    source('YARN_CACHE_FOLDER', unverifiedSource),
+  );
+  add(
+    under(pick('YARN_GLOBAL_FOLDER', under(home, ['.yarn', 'berry'])), [
+      'cache',
+    ]),
+    'Yarn (Berry) global cache',
+    'Projects without their own offline cache will download packages again.',
+    source('YARN_GLOBAL_FOLDER', defaultSource),
+  );
+  final pnpmStore = configured('PNPM_HOME')
+      ? under(absolute(env['PNPM_HOME']), ['store'])
+      : configured('XDG_DATA_HOME')
+      ? under(absolute(env['XDG_DATA_HOME']), ['pnpm', 'store'])
+      : windows
+      ? under(localAppData, ['pnpm', 'store'])
+      : macos
+      ? under(home, ['Library', 'pnpm', 'store'])
+      : under(home, ['.local', 'share', 'pnpm', 'store']);
+  add(
+    pnpmStore,
+    'pnpm content store',
+    'Projects hard-link files from this store, so sizes may be counted twice; pnpm store prune is the tool\'s own cleanup.',
+    configured('PNPM_HOME')
+        ? 'PNPM_HOME environment variable'
+        : configured('XDG_DATA_HOME')
+        ? 'XDG_DATA_HOME environment variable'
+        : defaultSource,
+  );
+  add(
+    pick('BUN_INSTALL_CACHE_DIR', under(home, ['.bun', 'install', 'cache'])),
+    'Bun install cache',
+    'Packages may need to be downloaded again on the next install.',
+    source('BUN_INSTALL_CACHE_DIR', defaultSource),
+  );
+  if (macos) {
+    add(
+      pick('CP_CACHE_DIR', under(home, ['Library', 'Caches', 'CocoaPods'])),
+      'CocoaPods download cache',
+      'Pods may need to be downloaded again; spec repos are stored elsewhere and are not included.',
+      source('CP_CACHE_DIR', defaultSource),
+    );
+    add(
+      under(home, ['Library', 'Caches', 'org.carthage.CarthageKit']),
+      'Carthage cache',
+      'Dependencies may need to be fetched or built again.',
+      unverifiedSource,
+    );
+    add(
+      under(home, ['Library', 'Caches', 'org.swift.swiftpm']),
+      'Swift Package Manager cache',
+      'Package repositories may need to be cloned again; first builds may be slower.',
+      unverifiedSource,
+    );
+  }
+  add(
+    under(home, ['.m2', 'repository']),
+    'Maven local repository',
+    'Also holds artifacts you built with mvn install that may not exist anywhere else.',
+    'Default location; Maven settings.xml may override it',
+    risk: CleanupRisk.potentiallyImportant,
+  );
+  add(
+    pick('NUGET_PACKAGES', under(home, ['.nuget', 'packages'])),
+    'NuGet global packages',
+    'Projects must restore packages again; open solutions may hold files in use.',
+    source('NUGET_PACKAGES', defaultSource),
+  );
+  add(
+    pick('GOCACHE', under(userCache, ['go-build'])),
+    'Go build cache',
+    'Builds and tests run slower until the cache is rebuilt.',
+    source('GOCACHE', 'Default location; go env -w may override it'),
+  );
+  final composerCache = configured('COMPOSER_CACHE_DIR')
+      ? absolute(env['COMPOSER_CACHE_DIR'])
+      : windows
+      ? under(localAppData, ['Composer'])
+      : configured('COMPOSER_HOME')
+      ? under(absolute(env['COMPOSER_HOME']), ['cache'])
+      : !macos && xdgConfigured
+      ? under(xdgCache, ['composer'])
+      : under(home, ['.composer', 'cache']);
+  add(
+    composerCache,
+    'Composer package cache',
+    'PHP packages may need to be downloaded again.',
+    configured('COMPOSER_CACHE_DIR')
+        ? 'COMPOSER_CACHE_DIR environment variable'
+        : configured('COMPOSER_HOME') && !windows
+        ? 'COMPOSER_HOME environment variable'
+        : defaultSource,
+  );
+  add(
+    pick('DENO_DIR', under(userCache, ['deno'])),
+    'Deno cache',
+    'Remote modules and npm packages may need to be downloaded again.',
+    source('DENO_DIR', defaultSource),
+  );
+  add(
+    pick('PLAYWRIGHT_BROWSERS_PATH', under(userCache, ['ms-playwright'])),
+    'Playwright browsers',
+    'Browsers must be downloaded again with playwright install before tests run.',
+    source('PLAYWRIGHT_BROWSERS_PATH', defaultSource),
+  );
+  add(
+    pick('PUPPETEER_CACHE_DIR', under(home, ['.cache', 'puppeteer'])),
+    'Puppeteer browsers',
+    'Browsers must be downloaded again before Puppeteer can run.',
+    source('PUPPETEER_CACHE_DIR', defaultSource),
+  );
+  final hfHub = configured('HF_HUB_CACHE')
+      ? absolute(env['HF_HUB_CACHE'])
+      : configured('HF_HOME')
+      ? under(absolute(env['HF_HOME']), ['hub'])
+      : xdgConfigured
+      ? under(xdgCache, ['huggingface', 'hub'])
+      : under(home, ['.cache', 'huggingface', 'hub']);
+  add(
+    hfHub,
+    'Hugging Face hub cache',
+    'Models and datasets can be very large and slow or costly to download again; gated or removed repos may be unavailable.',
+    configured('HF_HUB_CACHE')
+        ? 'HF_HUB_CACHE environment variable'
+        : configured('HF_HOME')
+        ? 'HF_HOME environment variable'
+        : defaultSource,
+    risk: CleanupRisk.potentiallyImportant,
+  );
+  add(
+    under(userCache, ['JetBrains']),
+    'JetBrains IDE caches',
+    'Indexes rebuild, but this folder can also hold Local History and logs that cannot be recreated.',
+    unverifiedSource,
+    risk: CleanupRisk.potentiallyImportant,
+  );
+  final codeUser = windows
+      ? under(absolute(env['APPDATA']), ['Code'])
+      : macos
+      ? under(home, ['Library', 'Application Support', 'Code'])
+      : configured('XDG_CONFIG_HOME')
+      ? under(absolute(env['XDG_CONFIG_HOME']), ['Code'])
+      : under(home, ['.config', 'Code']);
+  add(
+    under(codeUser, ['CachedData']),
+    'VS Code compiled code cache',
+    'VS Code may start slower once; close it first.',
+    unverifiedSource,
+  );
+  add(
+    under(codeUser, ['CachedExtensionVSIXs']),
+    'VS Code downloaded extension packages',
+    'Installed extensions stay; packages may be downloaded again on update.',
+    unverifiedSource,
+  );
+  add(
+    pick(
+      'ELECTRON_CACHE',
+      windows
+          ? under(localAppData, ['electron', 'Cache'])
+          : under(userCache, ['electron']),
+    ),
+    'Electron download cache',
+    'Electron binaries may need to be downloaded again on install.',
+    source('ELECTRON_CACHE', unverifiedSource),
+  );
+  add(
+    windows
+        ? under(localAppData, ['node-gyp', 'Cache'])
+        : under(userCache, ['node-gyp']),
+    'node-gyp headers cache',
+    'Node headers may need to be downloaded again for native module builds.',
+    unverifiedSource,
+  );
   return [
     if (gradleHome != null)
       DevFolder(
@@ -320,6 +545,7 @@ List<DevFolder> globalCacheCandidates(
             ? 'First GOPATH entry; Go configuration may override it'
             : 'Default location; Go configuration may override it',
       ),
+    ...extra,
     if (xcodeHome != null)
       DevFolder(
         p.join(xcodeHome, 'DerivedData'),
