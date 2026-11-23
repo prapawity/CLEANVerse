@@ -286,7 +286,7 @@ class _Brand extends StatelessWidget {
       child: Row(
         children: [
           Image.asset(
-            'assets/brand/cleanverse-brush-proposal.png',
+            'assets/brand/cleanverse-mark.png',
             width: compact ? 32 : 40,
             height: compact ? 32 : 40,
           ),
