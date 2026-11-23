@@ -55,7 +55,7 @@ enum DevSort { size, name, oldest, kind }
 class _DeveloperPageState extends State<DeveloperPage> {
   static const _pageSize = 50;
   String query = '';
-  DevSort sort = DevSort.size;
+  late DevSort sort = rememberedSort(context, 'developer', DevSort.size);
 
   List<DevFolder> _arrange(Iterable<DevFolder> folders) {
     final list = [
@@ -142,6 +142,7 @@ class _DeveloperPageState extends State<DeveloperPage> {
                 ],
                 onSort: (v) => setState(() {
                   sort = v;
+                  rememberSort(context, 'developer', v);
                   _shown.clear();
                 }),
               ),

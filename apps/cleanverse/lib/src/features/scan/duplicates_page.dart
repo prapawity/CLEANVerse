@@ -36,7 +36,11 @@ enum DuplicateSort { space, copies, fileSize, name }
 
 class _DuplicatesPageState extends State<DuplicatesPage> {
   String query = '';
-  DuplicateSort sort = DuplicateSort.space;
+  late DuplicateSort sort = rememberedSort(
+    context,
+    'duplicates',
+    DuplicateSort.space,
+  );
   final Set<String> selected = {};
 
   /// Group keys (first path) the user expanded or collapsed explicitly.
@@ -198,6 +202,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
               ],
               onSort: (v) => setState(() {
                 sort = v;
+                rememberSort(context, 'duplicates', v);
                 shown = duplicateGroupPageSize;
               }),
             ),

@@ -56,7 +56,11 @@ class LargeFilesPage extends StatefulWidget {
 
 class _LargeFilesPageState extends State<LargeFilesPage> {
   LargeFileFilter filter = LargeFileFilter.all;
-  LargeFileSort sort = LargeFileSort.size;
+  late LargeFileSort sort = rememberedSort(
+    context,
+    'largeFiles',
+    LargeFileSort.size,
+  );
   String query = '';
   int shown = largeFilesPageSize;
   final Set<String> selected = {};
@@ -151,6 +155,7 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
     ],
     onSort: (v) => setState(() {
       sort = v;
+      rememberSort(context, 'largeFiles', v);
       shown = largeFilesPageSize;
     }),
     trailing: SingleChildScrollView(

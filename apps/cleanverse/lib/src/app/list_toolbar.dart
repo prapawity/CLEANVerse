@@ -3,6 +3,7 @@ import 'dart:async';
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:cleanverse/src/app/theme.dart';
 
@@ -56,13 +57,50 @@ class ListToolbar<T> extends StatefulWidget {
   State<ListToolbar<T>> createState() => _ListToolbarState<T>();
 }
 
+/// Lets the shell's Cmd/Ctrl+F reach the search box of the visible page.
+abstract final class SearchFocus {
+  static FocusNode? _active;
+
+  /// Focuses the most recently shown search box. Returns false if none.
+  static bool focusActive() {
+    final node = _active;
+    if (node == null || node.context == null) return false;
+    node.requestFocus();
+    return true;
+  }
+}
+
 class _ListToolbarState<T> extends State<ListToolbar<T>> {
   late final _controller = TextEditingController(text: widget.initialQuery);
+  late final _focus = FocusNode(
+    debugLabel: 'list search',
+    onKeyEvent: (node, event) {
+      // Esc clears the search, then leaves the box on a second press.
+      if (event is KeyDownEvent &&
+          event.logicalKey == LogicalKeyboardKey.escape) {
+        if (_controller.text.isNotEmpty) {
+          _clear();
+        } else {
+          node.unfocus();
+        }
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    },
+  );
   Timer? _timer;
 
   @override
+  void initState() {
+    super.initState();
+    SearchFocus._active = _focus;
+  }
+
+  @override
   void dispose() {
+    if (SearchFocus._active == _focus) SearchFocus._active = null;
     _timer?.cancel();
+    _focus.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -95,6 +133,7 @@ class _ListToolbarState<T> extends State<ListToolbar<T>> {
   Widget build(BuildContext context) {
     final search = TextField(
       controller: _controller,
+      focusNode: _focus,
       onChanged: _changed,
       onSubmitted: (v) {
         _timer?.cancel();
@@ -214,3 +253,15 @@ class NoMatches extends StatelessWidget {
     ),
   );
 }
+
+/// Sort choices are remembered per page for this session (in memory only),
+/// so leaving a page and coming back keeps the order the user picked.
+T rememberedSort<T>(BuildContext context, String page, T fallback) {
+  final value = PageStorage.maybeOf(context)
+      ?.readState(context, identifier: 'sort:$page');
+  return value is T ? value : fallback;
+}
+
+void rememberSort(BuildContext context, String page, Object value) =>
+    PageStorage.maybeOf(context)
+        ?.writeState(context, value, identifier: 'sort:$page');

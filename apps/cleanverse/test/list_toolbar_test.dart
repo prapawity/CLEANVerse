@@ -1,6 +1,7 @@
 import 'package:cleanverse/src/app/list_toolbar.dart';
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 enum _S { a, b }
@@ -78,5 +79,40 @@ void main() {
       ),
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('focusActive focuses the search box and Esc clears it', (
+    tester,
+  ) async {
+    final queries = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListToolbar<_S>(
+            hint: 'Search',
+            onQuery: queries.add,
+            sort: _S.a,
+            sortOptions: const [SortOption(_S.a, 'Largest first')],
+            onSort: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(SearchFocus.focusActive(), isTrue);
+    await tester.pump();
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.focusNode!.hasFocus, isTrue);
+
+    await tester.enterText(find.byType(TextField), 'abc');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(queries.last, '');
+    expect(find.text('abc'), findsNothing);
+
+    // Second Esc leaves the box.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(field.focusNode!.hasFocus, isFalse);
   });
 }

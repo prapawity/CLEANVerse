@@ -3,6 +3,7 @@ import 'dart:io';
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:cleanverse/src/features/cleanup/cleanup_view_model.dart';
 import 'package:cleanverse/src/features/example/demo_scan.dart';
@@ -13,6 +14,7 @@ import 'package:cleanverse/src/data/scan_history.dart';
 import 'package:cleanverse/src/features/uninstall/uninstall_page.dart';
 import 'package:cleanverse/src/features/storage/storage_page.dart';
 import 'package:cleanverse/src/app/ui.dart';
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/features/uninstall/uninstall_view_model.dart';
 import 'package:cleanverse/src/features/cleanup/full_disk_access_banner.dart';
 import 'package:cleanverse/src/features/developer/developer_page.dart';
@@ -198,7 +200,20 @@ class _HomeScreenState extends State<HomeScreen> {
   };
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => CallbackShortcuts(
+    bindings: {
+      // Cmd+F on macOS, Ctrl+F elsewhere: jump to the page's search box.
+      SingleActivator(
+        LogicalKeyboardKey.keyF,
+        meta: Platform.isMacOS,
+        control: !Platform.isMacOS,
+      ): () =>
+          SearchFocus.focusActive(),
+    },
+    child: Focus(autofocus: true, child: _scaffold(context)),
+  );
+
+  Widget _scaffold(BuildContext context) => Scaffold(
     body: SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) {

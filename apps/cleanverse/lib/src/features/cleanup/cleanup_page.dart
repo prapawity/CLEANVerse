@@ -87,7 +87,7 @@ class _CleanupPageState extends State<CleanupPage> {
   CleanupViewModel get model => widget.model;
   bool _review = false;
   String query = '';
-  JunkSort sort = JunkSort.size;
+  late JunkSort sort = rememberedSort(context, 'cleanup', JunkSort.size);
 
   /// Items of [group] matching the search, in the chosen order.
   List<MeasuredJunk> _listed(JunkGroup group) {
@@ -198,7 +198,10 @@ class _CleanupPageState extends State<CleanupPage> {
                 SortOption(JunkSort.safest, 'Safest first'),
                 SortOption(JunkSort.riskiest, 'Riskiest first'),
               ],
-              onSort: (v) => setState(() => sort = v),
+              onSort: (v) {
+                setState(() => sort = v);
+                rememberSort(context, 'cleanup', v);
+              },
             ),
             MatchCount(
               shown: [for (final g in JunkGroup.values) ..._listed(g)].length,

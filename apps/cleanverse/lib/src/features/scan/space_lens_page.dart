@@ -42,7 +42,7 @@ enum FolderSort { size, name, files }
 class _SpaceLensPageState extends State<SpaceLensPage> {
   int shown = folderPageSize;
   String query = '';
-  FolderSort sort = FolderSort.size;
+  late FolderSort sort = rememberedSort(context, 'folders', FolderSort.size);
   String? _shownRoot;
 
   FolderScanViewModel get model => widget.model;
@@ -177,6 +177,7 @@ class _SpaceLensPageState extends State<SpaceLensPage> {
               ],
               onSort: (v) => setState(() {
                 sort = v;
+                rememberSort(context, 'folders', v);
                 shown = folderPageSize;
               }),
             ),

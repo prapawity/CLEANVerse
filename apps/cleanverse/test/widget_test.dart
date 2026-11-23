@@ -413,4 +413,20 @@ void main() {
     expect(formatBytes(2048), '2.0 KiB');
     expect(formatBytes(80 * 1024 * 1024), '80.0 MiB');
   });
+
+  testWidgets('sort choice is remembered when coming back to a page', (
+    tester,
+  ) async {
+    await pumpApp(tester, FakeFolderScanner());
+    await tester.tap(find.text('Scan now'));
+    await tester.pumpAndSettle();
+    await openSection(tester, 'Storage');
+    await tester.tap(find.text('Largest first'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Oldest first').last);
+    await tester.pumpAndSettle();
+    await openSection(tester, 'Home');
+    await openSection(tester, 'Storage');
+    expect(find.text('Oldest first'), findsOneWidget);
+  });
 }
