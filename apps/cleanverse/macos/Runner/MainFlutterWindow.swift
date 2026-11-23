@@ -10,6 +10,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     AppIconChannel.register(with: flutterViewController.engine.binaryMessenger)
+    VolumesChannel.register(with: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }
@@ -51,5 +52,52 @@ enum AppIconChannel {
               from: .zero, operation: .copy, fraction: 1.0)
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])
+  }
+}
+
+/// Mounted volumes with the sizes Finder shows. Read-only.
+enum VolumesChannel {
+  static func register(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "cleanverse/volumes", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "list" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      DispatchQueue.global(qos: .userInitiated).async {
+        let list = volumes()
+        DispatchQueue.main.async { result(list) }
+      }
+    }
+  }
+
+  static func volumes() -> [[String: Any]] {
+    let keys: [URLResourceKey] = [
+      .volumeNameKey, .volumeTotalCapacityKey,
+      .volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey,
+      .volumeIsInternalKey, .volumeIsRemovableKey, .volumeIsRootFileSystemKey,
+      .volumeIsBrowsableKey,
+    ]
+    let urls = FileManager.default.mountedVolumeURLs(
+      includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
+    var out: [[String: Any]] = []
+    for url in urls {
+      guard let v = try? url.resourceValues(forKeys: Set(keys)),
+            v.volumeIsBrowsable ?? true,
+            let total = v.volumeTotalCapacity, total > 0 else { continue }
+      // "Important usage" includes purgeable space, matching Finder.
+      let free = v.volumeAvailableCapacityForImportantUsage
+        ?? Int64(v.volumeAvailableCapacity ?? 0)
+      out.append([
+        "path": url.path,
+        "name": v.volumeName ?? url.lastPathComponent,
+        "total": Int64(total),
+        "free": free,
+        "internal": v.volumeIsInternal ?? false,
+        "removable": v.volumeIsRemovable ?? false,
+        "root": v.volumeIsRootFileSystem ?? false,
+      ])
+    }
+    return out
   }
 }

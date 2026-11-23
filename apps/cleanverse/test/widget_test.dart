@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:cleanverse/src/app/app.dart';
+import 'package:cleanverse/src/features/uninstall/uninstall_view_model.dart';
+import 'package:cleanverse/src/features/uninstall/app_catalog.dart';
+import 'package:cleanverse/src/data/volumes.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_view_model.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_page.dart';
 import 'package:cleanverse/src/features/cleanup/junk_catalog.dart';
@@ -127,6 +130,18 @@ class LiveFolderScanner implements FolderScanner {
   }
 }
 
+class _NoVolumes extends VolumeReader {
+  @override
+  Future<List<Volume>> list() async => const [];
+}
+
+class _NoApps extends AppCatalog {
+  _NoApps()
+    : super(environment: const {}, folders: const [], systemFolders: const []);
+  @override
+  Future<List<InstalledApp>> listApps() async => const [];
+}
+
 Future<void> pumpApp(
   WidgetTester tester,
   FolderScanner scanner, {
@@ -144,6 +159,8 @@ Future<void> pumpApp(
       pickFolder: () async => 'chosen',
       homeFolder: () => 'home',
       cleanup: cleanup ?? CleanupViewModel(loader: () async => const []),
+      volumes: VolumesModel(reader: _NoVolumes()),
+      uninstall: UninstallViewModel(catalog: _NoApps()),
     ),
   );
 }

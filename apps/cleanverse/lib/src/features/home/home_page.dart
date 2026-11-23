@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
@@ -9,6 +10,8 @@ import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/data/scan_history.dart';
+import 'package:cleanverse/src/data/volumes.dart';
+import 'package:cleanverse/src/features/home/storage_dashboard.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_view_model.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:cleanverse/src/features/scan/smart_scan_page.dart';
@@ -27,7 +30,9 @@ class HomePage extends StatelessWidget {
     this.growth,
     this.historyEnabled = false,
     this.appsSupported = false,
+    this.volumes,
   });
+  final VolumesModel? volumes;
   final FolderScanViewModel model;
   final CleanupViewModel cleanup;
   final UninstallViewModel? uninstall;
@@ -40,8 +45,15 @@ class HomePage extends StatelessWidget {
       (model.busy && !model.pickingExclusion && model.root != null) ||
       cleanup.scanning;
 
-  Future<void> _scanNow() =>
-      Future.wait([model.startDefault(), cleanup.scan()]);
+  Future<void> _scanNow() async {
+    // Apps are listed and measured in the background for the dashboard.
+    final apps = uninstall;
+    if (appsSupported && apps != null && apps.apps == null && !apps.busy) {
+      unawaited(apps.loadApps());
+    }
+    await Future.wait([model.startDefault(), cleanup.scan()]);
+    await volumes?.load();
+  }
 
   Future<void> _chooseFolder() =>
       Future.wait([model.start(), if (!cleanup.busy) cleanup.scan()]);
@@ -51,7 +63,13 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([model, cleanup, ?uninstall, ?growth]),
+    listenable: Listenable.merge([
+      model,
+      cleanup,
+      ?uninstall,
+      ?growth,
+      ?volumes,
+    ]),
     builder: (context, _) {
       final result = model.result;
       final Widget body;
@@ -76,6 +94,11 @@ class HomePage extends StatelessWidget {
       return PageScroll(
         maxWidth: 860,
         children: [
+          if (volumes != null) ...[
+            _dashboard(),
+            const SizedBox(height: CvSpace.xl),
+            const Divider(color: CvColors.outlineSoft),
+          ],
           body,
           if (model.error != null)
             Padding(
@@ -91,6 +114,32 @@ class HomePage extends StatelessWidget {
       );
     },
   );
+
+  Widget _dashboard() {
+    final result = model.result;
+    final home = model.homeFolder();
+    final scannedHome =
+        result != null &&
+        !model.busy &&
+        home != null &&
+        model.root != null &&
+        p.equals(p.normalize(model.root!), p.normalize(home));
+    final junk = cleanup.found?.fold<int>(0, (s, j) => s + j.bytes);
+    final dev = result?.devFolders
+        .where((f) => f.projectMarker != null)
+        .fold<int>(0, (s, f) => s + f.logicalBytes);
+    final apps = uninstall?.appSizes.values.fold<int>(0, (s, b) => s + b);
+    return StorageDashboard(
+      volumes: volumes!,
+      onNavigate: onNavigate,
+      homeBytes: scannedHome ? result.totalBytes : null,
+      junkBytes: junk,
+      developerBytes: dev,
+      appsBytes: appsSupported ? apps : null,
+      appsMeasuring: appsSupported && (uninstall?.measuringSizes ?? false),
+      appsSupported: appsSupported,
+    );
+  }
 
   List<_Finding> _findings(FolderScanResult result) {
     final byBytes = <_Finding>[];

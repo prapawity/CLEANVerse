@@ -14,6 +14,7 @@ import 'package:cleanverse/src/data/scan_history.dart';
 import 'package:cleanverse/src/features/uninstall/uninstall_page.dart';
 import 'package:cleanverse/src/features/storage/storage_page.dart';
 import 'package:cleanverse/src/app/ui.dart';
+import 'package:cleanverse/src/data/volumes.dart';
 import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/features/uninstall/uninstall_view_model.dart';
 import 'package:cleanverse/src/features/cleanup/full_disk_access_banner.dart';
@@ -58,6 +59,8 @@ class CleanVerseApp extends StatelessWidget {
     this.pickFolder,
     this.cleanup,
     this.homeFolder,
+    this.volumes,
+    this.uninstall,
   });
   final ScanRepository repository;
   final FolderScanner? scanner;
@@ -66,6 +69,12 @@ class CleanVerseApp extends StatelessWidget {
 
   /// Default scan scope for Home; the user's home folder when null.
   final String? Function()? homeFolder;
+
+  /// Drive list for the dashboard (tests inject a fake).
+  final VolumesModel? volumes;
+
+  /// App list for the uninstaller and dashboard (tests inject a fake).
+  final UninstallViewModel? uninstall;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -78,6 +87,8 @@ class CleanVerseApp extends StatelessWidget {
       pickFolder: pickFolder,
       cleanup: cleanup,
       homeFolder: homeFolder,
+      volumes: volumes,
+      uninstall: uninstall,
     ),
   );
 }
@@ -90,12 +101,20 @@ class HomeScreen extends StatefulWidget {
     this.pickFolder,
     this.cleanup,
     this.homeFolder,
+    this.volumes,
+    this.uninstall,
   });
   final ScanRepository repository;
   final FolderScanner? scanner;
   final Future<String?> Function()? pickFolder;
   final CleanupViewModel? cleanup;
   final String? Function()? homeFolder;
+
+  /// Drive list for the dashboard (tests inject a fake).
+  final VolumesModel? volumes;
+
+  /// App list for the uninstaller and dashboard (tests inject a fake).
+  final UninstallViewModel? uninstall;
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -108,7 +127,9 @@ class _HomeScreenState extends State<HomeScreen> {
     homeFolder: widget.homeFolder,
   );
   late final CleanupViewModel cleanup = widget.cleanup ?? CleanupViewModel();
-  final UninstallViewModel uninstall = UninstallViewModel();
+  late final UninstallViewModel uninstall =
+      widget.uninstall ?? UninstallViewModel();
+  late final VolumesModel volumes = widget.volumes ?? VolumesModel();
   final AppSettings settings = AppSettings();
   late final UpdateViewModel updates = UpdateViewModel(settings: settings);
   final ValueNotifier<ScanComparison?> growth = ValueNotifier(null);
@@ -129,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     activeIgnoreList = settings.ignoreList;
     scan.onScanCompleted = _recordScan;
+    volumes.load();
     settings.load().then((_) async {
       try {
         activeOperationLog = await settings.operationLog();
@@ -153,7 +175,8 @@ class _HomeScreenState extends State<HomeScreen> {
     updates.dispose();
     settings.dispose();
     growth.dispose();
-    uninstall.dispose();
+    if (widget.uninstall == null) uninstall.dispose();
+    if (widget.volumes == null) volumes.dispose();
     super.dispose();
   }
 
@@ -166,6 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
       growth: growth,
       historyEnabled: settings.keepScanHistory,
       appsSupported: Platform.isMacOS,
+      volumes: volumes,
     ),
     Section.cleanup => CleanupPage(
       model: cleanup,
