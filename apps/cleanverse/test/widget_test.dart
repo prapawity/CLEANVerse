@@ -131,12 +131,29 @@ class LiveFolderScanner implements FolderScanner {
 }
 
 class FakeVolumes extends VolumeReader {
+  FakeVolumes([this.volumes = const []]);
+  final List<Volume> volumes;
   int calls = 0;
   @override
   Future<List<Volume>> list() async {
     calls++;
-    return const [];
+    return volumes;
   }
+}
+
+/// Returns a scan the user cancelled halfway.
+class CancelledScanner implements FolderScanner {
+  @override
+  Future<FolderScanResult> scan(
+    String path,
+    bool Function() cancelled, {
+    List<String> exclusions = const [],
+    bool findDuplicates = false,
+    bool findDevFolders = false,
+    void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
+  }) async =>
+      const FolderScanResult([], 0, true, filesSeen: 10, totalBytes: 1024);
 }
 
 class _NoApps extends AppCatalog {
@@ -511,5 +528,24 @@ void main() {
     await openSection(tester, 'Clean up');
     await openSection(tester, 'Home');
     expect(volumes.calls, before + 1);
+  });
+
+  testWidgets('a cancelled scan does not split the drive into categories', (
+    tester,
+  ) async {
+    final volumes = FakeVolumes(const [
+      Volume(
+        path: '/',
+        name: 'Macintosh HD',
+        totalBytes: 100 * 1024 * 1024 * 1024,
+        freeBytes: 40 * 1024 * 1024 * 1024,
+        isSystem: true,
+      ),
+    ]);
+    await pumpApp(tester, CancelledScanner(), volumes: volumes);
+    await tester.tap(find.text('Scan now'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Scan to see'), findsOneWidget);
+    expect(find.text('Your files'), findsNothing);
   });
 }

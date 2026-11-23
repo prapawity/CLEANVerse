@@ -15,7 +15,6 @@ import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/data/removal.dart';
 import 'package:cleanverse/src/features/cleanup/removal_dialog.dart';
 import 'package:cleanverse/src/features/developer/cleanup_plan.dart';
-import 'package:cleanverse/src/features/developer/default_scan.dart';
 import 'package:cleanverse/src/features/developer/developer_quick_check.dart';
 import 'package:cleanverse/src/features/developer/docker.dart';
 import 'package:cleanverse/src/features/developer/docker_panel.dart';
@@ -341,7 +340,7 @@ class _ScanPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final home = defaultScanRoot();
+    final home = model.homeFolder();
     return Padding(
       padding: const EdgeInsets.only(bottom: CvSpace.xl),
       child: Column(

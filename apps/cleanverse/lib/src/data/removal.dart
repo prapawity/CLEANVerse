@@ -75,6 +75,14 @@ abstract interface class TrashBackend {
   Future<Map<String, String?>> moveToTrash(List<String> paths);
 }
 
+/// True when [path] is a link (symlink, or a junction on Windows). Trash
+/// backends refuse links because the system Trash would move the target.
+bool _isLink(String path) =>
+    FileSystemEntity.typeSync(path, followLinks: false) ==
+    FileSystemEntityType.link;
+
+const _linkRefused = 'This is a link; links are never moved to the Trash.';
+
 TrashBackend platformTrash() {
   if (Platform.isWindows) return WindowsRecycleBin();
   if (Platform.isMacOS) return MacTrash();
@@ -107,8 +115,15 @@ foreach ($path in [System.IO.File]::ReadAllLines($env:CLEANVERSE_LIST, [System.T
   @override
   Future<Map<String, String?>> moveToTrash(List<String> paths) async {
     final results = <String, String?>{
-      for (final path in paths) path: 'Recycle Bin did not report a result.',
+      for (final path in paths)
+        path: _isLink(path)
+            ? _linkRefused
+            : 'Recycle Bin did not report a result.',
     };
+    paths = [
+      for (final path in paths)
+        if (results[path] != _linkRefused) path,
+    ];
     if (paths.isEmpty) return results;
     final dir = await Directory.systemTemp.createTemp('cleanverse');
     try {
@@ -151,22 +166,50 @@ foreach ($path in [System.IO.File]::ReadAllLines($env:CLEANVERSE_LIST, [System.T
 /// Asks Finder to move items to the Trash. The path is passed as an argument,
 /// not embedded in the script.
 class MacTrash implements TrashBackend {
+  // One osascript call per batch: starting osascript once per item takes
+  // minutes for a few hundred items. Each path is still tried on its own.
+  static const _script = [
+    'on run argv',
+    'set out to ""',
+    'repeat with p in argv',
+    'try',
+    'tell application "Finder" to delete (POSIX file (contents of p) as alias)',
+    'set out to out & "OK" & tab & (contents of p) & linefeed',
+    'on error',
+    'set out to out & "ERR" & tab & (contents of p) & linefeed',
+    'end try',
+    'end repeat',
+    'return out',
+    'end run',
+  ];
+
   @override
   Future<Map<String, String?>> moveToTrash(List<String> paths) async {
+    const failed = 'Finder could not move this item to the Trash.';
     final results = <String, String?>{};
+    final queue = <String>[];
     for (final path in paths) {
+      if (_isLink(path)) {
+        results[path] = _linkRefused;
+      } else {
+        results[path] = failed; // until Finder reports success
+        queue.add(path);
+      }
+    }
+    for (var i = 0; i < queue.length; i += 200) {
+      final batch = queue.sublist(i, (i + 200).clamp(0, queue.length));
       final run = await Process.run('osascript', [
-        '-e',
-        'on run argv',
-        '-e',
-        'tell application "Finder" to delete (POSIX file (item 1 of argv) as alias)',
-        '-e',
-        'end run',
-        path,
-      ]);
-      results[path] = run.exitCode == 0
-          ? null
-          : 'Finder could not move this item to the Trash.';
+        for (final line in _script) ...['-e', line],
+        ...batch,
+      ], stdoutEncoding: utf8);
+      for (final line in LineSplitter.split('${run.stdout}')) {
+        final tab = line.indexOf('\t');
+        if (tab < 0) continue;
+        final path = line.substring(tab + 1);
+        if (line.startsWith('OK') && results.containsKey(path)) {
+          results[path] = null;
+        }
+      }
     }
     return results;
   }
@@ -185,6 +228,7 @@ class LinuxTrash implements TrashBackend {
   }
 
   Future<String?> _trash(String path) async {
+    if (_isLink(path)) return _linkRefused;
     for (final command in [
       ['gio', 'trash', '--', path],
       ['trash-put', '--', path],
@@ -365,6 +409,9 @@ Future<RemovalOutcome> _removeOne(
     }
     try {
       await for (final child in Directory(item.path).list(followLinks: false)) {
+        // Links are never removed: the Trash (Finder, Recycle Bin) acts on
+        // what a link points to, which could be a personal folder.
+        if (child is Link) continue;
         if (item.keepNames.contains(p.basename(child.path))) continue;
         if (ignored != null &&
             (ignored.covers(child.path) ||

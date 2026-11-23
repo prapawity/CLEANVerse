@@ -32,20 +32,11 @@ class UninstallPage extends StatefulWidget {
 
 class _UninstallPageState extends State<UninstallPage> {
   UninstallViewModel get model => widget.model;
-  late final TextEditingController _search = TextEditingController(
-    text: model.query,
-  );
 
   @override
   void initState() {
     super.initState();
     if (widget.supported && model.apps == null) model.loadApps();
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
   }
 
   /// The primary action. With nothing ticked it offers every removable
