@@ -1,0 +1,74 @@
+name: Prepare release
+
+# Opens a release/vX.Y.Z pull request that bumps pubspec.yaml and the build
+# number and adds a CHANGELOG entry. After it merges, push the tag yourself
+# (tags pushed with the workflow token do not start the Release workflow).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version without "v", e.g. 1.3.0 or 1.3.0-beta.1'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Bump version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "Version must look like 1.3.0 or 1.3.0-beta.1" >&2; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
+            echo "Tag v$VERSION already exists" >&2; exit 1
+          fi
+          pubspec=apps/cleanverse/pubspec.yaml
+          build=$(grep -E '^version:' "$pubspec" | sed -E 's/.*\+([0-9]+).*/\1/')
+          next=$((build + 1))
+          sed -i -E "s/^version: .*/version: $VERSION+$next/" "$pubspec"
+          prev=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          range=${prev:+$prev..HEAD}
+          {
+            echo "## $VERSION - $(date -u +%Y-%m-%d)"
+            echo
+            git log --no-merges --pretty="- %s" ${range:+"$range"} | grep -v '\[skip changelog\]' || true
+            echo
+            [ -f CHANGELOG.md ] && sed '1{/^# Changelog$/d}' CHANGELOG.md
+          } > /tmp/entry.md
+          { echo "# Changelog"; echo; cat /tmp/entry.md; } > CHANGELOG.md
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          branch="release/v$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Release $VERSION" -q
+          git add CHANGELOG.md && git commit --amend --no-edit -q
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Release $VERSION" --body "$(cat <<BODY
+          Bumps the app to **$VERSION** and updates CHANGELOG.md. Edit the changelog in this PR if needed.
+
+          After merging:
+
+          \`\`\`sh
+          git switch main && git pull
+          git tag -a v$VERSION -m "CLEANVerse $VERSION"
+          git push origin v$VERSION
+          \`\`\`
+
+          The Release workflow then creates a draft release to review (docs/RELEASING.md).
+          BODY
+          )"
