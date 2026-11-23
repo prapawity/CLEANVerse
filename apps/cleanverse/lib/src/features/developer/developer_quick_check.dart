@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:cleanverse/src/features/developer/tool_commands_panel.dart';
 import 'package:cleanverse/src/features/developer/docker_panel.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 
@@ -157,6 +158,7 @@ class _DeveloperQuickCheckState extends State<DeveloperQuickCheck> {
         ),
       ],
       DockerPanel(enabled: widget.enabled),
+      ToolCommandsPanel(enabled: widget.enabled, windows: Platform.isWindows),
     ],
   );
 }
