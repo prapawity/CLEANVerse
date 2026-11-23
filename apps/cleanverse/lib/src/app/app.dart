@@ -19,7 +19,7 @@ import 'package:cleanverse/src/features/developer/developer_page.dart';
 import 'package:cleanverse/src/features/scan/duplicates_page.dart';
 import 'package:cleanverse/src/features/example/example_page.dart';
 import 'package:cleanverse/src/features/scan/large_files_page.dart';
-import 'package:cleanverse/src/features/scan/smart_scan_page.dart';
+import 'package:cleanverse/src/features/home/home_page.dart';
 import 'package:cleanverse/src/features/settings/settings_page.dart';
 import 'package:cleanverse/src/features/scan/space_lens_page.dart';
 import 'package:cleanverse/src/features/settings/app_settings.dart';
@@ -55,11 +55,15 @@ class CleanVerseApp extends StatelessWidget {
     this.scanner,
     this.pickFolder,
     this.cleanup,
+    this.homeFolder,
   });
   final ScanRepository repository;
   final FolderScanner? scanner;
   final Future<String?> Function()? pickFolder;
   final CleanupViewModel? cleanup;
+
+  /// Default scan scope for Home; the user's home folder when null.
+  final String? Function()? homeFolder;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -71,6 +75,7 @@ class CleanVerseApp extends StatelessWidget {
       scanner: scanner,
       pickFolder: pickFolder,
       cleanup: cleanup,
+      homeFolder: homeFolder,
     ),
   );
 }
@@ -82,11 +87,13 @@ class HomeScreen extends StatefulWidget {
     this.scanner,
     this.pickFolder,
     this.cleanup,
+    this.homeFolder,
   });
   final ScanRepository repository;
   final FolderScanner? scanner;
   final Future<String?> Function()? pickFolder;
   final CleanupViewModel? cleanup;
+  final String? Function()? homeFolder;
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -96,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final FolderScanViewModel scan = FolderScanViewModel(
     widget.scanner ?? LocalFolderScanner(),
     widget.pickFolder ?? chooseFolder,
+    homeFolder: widget.homeFolder,
   );
   late final CleanupViewModel cleanup = widget.cleanup ?? CleanupViewModel();
   final UninstallViewModel uninstall = UninstallViewModel();
@@ -155,16 +163,22 @@ class _HomeScreenState extends State<HomeScreen> {
     Section.storage ||
     Section.largeFiles ||
     Section.spaceLens ||
-    Section.duplicates => _page(),
+    Section.duplicates ||
+    Section.home ||
+    Section.settings ||
+    Section.example => _page(),
     _ => _legacy(_page()),
   };
 
   Widget _page() => switch (section) {
-    Section.home => SmartScanPage(
+    Section.home => HomePage(
       model: scan,
+      cleanup: cleanup,
+      uninstall: uninstall,
       onNavigate: _go,
       growth: growth,
       historyEnabled: settings.keepScanHistory,
+      appsSupported: Platform.isMacOS,
     ),
     Section.cleanup => CleanupPage(
       model: cleanup,
@@ -210,12 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
             listenable: scan,
             builder: (context, _) => Row(
               children: [
-                if (wide)
-                  _Sidebar(
-                    selected: section,
-                    onSelected: _go,
-                    badges: _badges(scan),
-                  ),
+                if (wide) _Sidebar(selected: section, onSelected: _go),
                 Expanded(
                   child: Column(
                     children: [
@@ -226,11 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         visible: section != Section.settings,
                       ),
                       if (!wide)
-                        _CompactNav(
-                          selected: section,
-                          onSelected: _go,
-                          badges: _badges(scan),
-                        ),
+                        _CompactNav(selected: section, onSelected: _go),
                       Expanded(
                         child: KeyedSubtree(
                           key: ValueKey(section),
@@ -247,16 +252,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ),
   );
-}
-
-/// Result counts shown beside navigation items once a scan has finished.
-Map<Section, String> _badges(FolderScanViewModel model) {
-  final result = model.result;
-  if (result == null || model.busy) return const {};
-  return {
-    if (model.findDevFolders && result.devFolders.isNotEmpty)
-      Section.developer: '${result.devFolders.length}',
-  };
 }
 
 class _Brand extends StatelessWidget {
@@ -347,18 +342,13 @@ Section _navOwner(Section section) => switch (section) {
 };
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({
-    required this.selected,
-    required this.onSelected,
-    required this.badges,
-  });
+  const _Sidebar({required this.selected, required this.onSelected});
   final Section selected;
   final ValueChanged<Section> onSelected;
-  final Map<Section, String> badges;
 
   @override
   Widget build(BuildContext context) => Container(
-    width: 240,
+    width: 220,
     decoration: const BoxDecoration(
       color: CvColors.sidebar,
       border: Border(right: BorderSide(color: CvColors.outlineSoft)),
@@ -372,19 +362,23 @@ class _Sidebar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 22, 16, 18),
+                  padding: EdgeInsets.fromLTRB(20, 22, 16, 22),
                   child: _Brand(),
                 ),
                 for (final (title, items) in _navGroups) ...[
                   if (title != null)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 14, 24, 6),
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          color: CvColors.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                      padding: const EdgeInsets.fromLTRB(22, 20, 22, 6),
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: CvColors.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: .4,
+                          ),
                         ),
                       ),
                     ),
@@ -392,7 +386,6 @@ class _Sidebar extends StatelessWidget {
                     _NavItem(
                       section: item,
                       selected: item == _navOwner(selected),
-                      badge: badges[item],
                       onPressed: () => onSelected(item),
                     ),
                 ],
@@ -417,82 +410,48 @@ class _NavItem extends StatelessWidget {
     required this.section,
     required this.selected,
     required this.onPressed,
-    this.badge,
   });
   final Section section;
   final bool selected;
   final VoidCallback onPressed;
-  final String? badge;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
     child: Semantics(
       selected: selected,
       button: true,
       child: Material(
-        color: selected ? const Color(0xff293a50) : Colors.transparent,
-        borderRadius: BorderRadius.circular(11),
+        color: selected ? CvColors.raised : Colors.transparent,
+        borderRadius: BorderRadius.circular(CvRadius.sm),
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(CvRadius.sm),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 44),
+            constraints: const BoxConstraints(minHeight: 40),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               child: Row(
                 children: [
-                  Container(
-                    width: 3,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: selected ? CvColors.cyan : Colors.transparent,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Icon(
                     section.icon,
-                    size: 19,
+                    size: 18,
                     color: selected ? CvColors.cyan : CvColors.muted,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       section.label,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: selected
-                            ? const Color(0xffeff7ff)
-                            : CvColors.muted,
+                        color: selected ? CvColors.text : CvColors.muted,
                         fontSize: 13,
                         fontWeight: selected
-                            ? FontWeight.w700
+                            ? FontWeight.w600
                             : FontWeight.w500,
                       ),
                     ),
                   ),
-                  if (badge != null)
-                    Container(
-                      margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: CvColors.raised,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        badge!,
-                        semanticsLabel: '$badge results',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: CvColors.text,
-                        ),
-                      ),
-                    )
-                  else
-                    const SizedBox(width: 12),
                 ],
               ),
             ),
@@ -503,40 +462,28 @@ class _NavItem extends StatelessWidget {
   );
 }
 
-/// Narrow-window navigation: a scrollable row of choice chips.
+/// Narrow-window navigation: one scrollable row of plain tabs.
 class _CompactNav extends StatelessWidget {
-  const _CompactNav({
-    required this.selected,
-    required this.onSelected,
-    required this.badges,
-  });
+  const _CompactNav({required this.selected, required this.onSelected});
   final Section selected;
   final ValueChanged<Section> onSelected;
-  final Map<Section, String> badges;
 
   @override
   Widget build(BuildContext context) => Container(
+    width: double.infinity,
     decoration: const BoxDecoration(
       border: Border(bottom: BorderSide(color: CvColors.outlineSoft)),
     ),
     child: SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
           for (final item in _navSections)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                avatar: Icon(item.icon, size: 16),
-                label: Text(
-                  badges[item] == null
-                      ? item.label
-                      : '${item.label} · ${badges[item]}',
-                ),
-                selected: item == _navOwner(selected),
-                onSelected: (_) => onSelected(item),
-              ),
+            _CompactTab(
+              section: item,
+              selected: item == _navOwner(selected),
+              onPressed: () => onSelected(item),
             ),
         ],
       ),
@@ -544,6 +491,48 @@ class _CompactNav extends StatelessWidget {
   );
 }
 
+class _CompactTab extends StatelessWidget {
+  const _CompactTab({
+    required this.section,
+    required this.selected,
+    required this.onPressed,
+  });
+  final Section section;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    selected: selected,
+    button: true,
+    child: InkWell(
+      onTap: onPressed,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              width: 2,
+              color: selected ? CvColors.cyan : Colors.transparent,
+            ),
+          ),
+        ),
+        child: Text(
+          section.label,
+          style: TextStyle(
+            fontSize: 13,
+            color: selected ? CvColors.text : CvColors.muted,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Current page title and, once chosen, the scan scope.
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.wide,
@@ -557,45 +546,77 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final root = model.root;
+    final home = model.homeFolder();
+    final scope = root == null
+        ? null
+        : home != null && root == home
+        ? 'Home folder'
+        : root;
     return Container(
-      constraints: const BoxConstraints(minHeight: 60),
-      padding: EdgeInsets.symmetric(horizontal: wide ? 40 : 16, vertical: 10),
+      constraints: const BoxConstraints(minHeight: 52),
+      padding: EdgeInsets.symmetric(horizontal: wide ? 40 : 16, vertical: 8),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: CvColors.outlineSoft)),
       ),
       child: Row(
         children: [
           Expanded(
-            child: wide
-                ? Text(
-                    root == null ? section.label : 'Scope: $root',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: root == null ? 15 : 13,
-                      fontWeight: root == null
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: root == null ? CvColors.text : CvColors.muted,
+            child: Row(
+              children: [
+                if (wide)
+                  Text(
+                    _navOwner(section).label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
                   )
-                : const _Brand(compact: true),
-          ),
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.lock_outline_rounded,
-            size: 15,
-            color: CvColors.mint,
-            semanticLabel: 'On this device',
-          ),
-          if (wide) ...[
-            const SizedBox(width: 6),
-            const ExcludeSemantics(
-              child: Text(
-                'On this device',
-                style: TextStyle(color: Color(0xffb8c6d7), fontSize: 12),
-              ),
+                else
+                  const Flexible(child: _Brand(compact: true)),
+                if (scope != null) ...[
+                  const SizedBox(width: CvSpace.md),
+                  const ExcludeSemantics(
+                    child: Text('·', style: TextStyle(color: CvColors.muted)),
+                  ),
+                  const SizedBox(width: CvSpace.md),
+                  Flexible(
+                    child: OneLinePath(
+                      scope,
+                      prefix: wide ? 'Scope: ' : '',
+                      style: const TextStyle(
+                        color: CvColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
+          const SizedBox(width: CvSpace.md),
+          Tooltip(
+            message: 'Scans and results stay on this device.',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 14,
+                  color: CvColors.mint,
+                  semanticLabel: 'On this device',
+                ),
+                if (wide) ...[
+                  const SizedBox(width: 6),
+                  const ExcludeSemantics(
+                    child: Text(
+                      'On this device',
+                      style: TextStyle(color: CvColors.muted, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

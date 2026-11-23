@@ -326,6 +326,28 @@ class Swatch extends StatelessWidget {
   );
 }
 
+/// A path on one line, cut with an ellipsis when it does not fit. The full
+/// path is in the tooltip.
+class OneLinePath extends StatelessWidget {
+  const OneLinePath(this.path, {super.key, this.prefix = '', this.style});
+  final String path;
+  final String prefix;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: path,
+    waitDuration: const Duration(milliseconds: 500),
+    child: Text(
+      '$prefix$path',
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    ),
+  );
+}
+
 /// Page body that owns its scrolling. The shell gives each page the full
 /// content area; pages put lazy lists in [slivers] and keep selection
 /// actions in [bottomBar], which stays visible. Content is centered at
