@@ -107,27 +107,13 @@ class _DockerPanelState extends State<DockerPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: CvSpace.lg),
-        Row(
-          children: [
-            const Icon(Icons.dns_outlined, size: 18, color: CvColors.violet),
-            const SizedBox(width: CvSpace.sm),
-            const Expanded(
-              child: Text(
-                'Docker',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (current?.state == DockerState.ready)
-              const StatusChip('Running', color: CvColors.mint),
-            if (current?.state == DockerState.notRunning)
-              const StatusChip('Not running', color: CvColors.amber),
-          ],
-        ),
-        const Text(
-          'Uses the Docker CLI and your active Docker context.',
-          style: TextStyle(color: CvColors.muted, fontSize: 12),
-        ),
+        Text(switch (current?.state) {
+          DockerState.ready =>
+            'Running. Uses the Docker CLI and your active Docker context.',
+          DockerState.notRunning =>
+            'Not running. Uses the Docker CLI and your active Docker context.',
+          _ => 'Uses the Docker CLI and your active Docker context.',
+        }, style: const TextStyle(color: CvColors.muted, fontSize: 12)),
         const SizedBox(height: CvSpace.sm),
         if (status != null)
           Padding(
@@ -259,9 +245,12 @@ class _Usage extends StatelessWidget {
         runSpacing: CvSpace.sm,
         children: [
           for (final kind in DockerPrune.values)
-            OutlinedButton(
-              onPressed: enabled ? () => onPrune(kind) : null,
-              child: Text('Clean ${kind.label.toLowerCase()}'),
+            Tooltip(
+              message: 'Runs: docker ${kind.args.join(' ')}',
+              child: OutlinedButton(
+                onPressed: enabled ? () => onPrune(kind) : null,
+                child: Text('Clean ${kind.label.toLowerCase()}'),
+              ),
             ),
           TextButton.icon(
             onPressed: enabled ? onRefresh : null,

@@ -48,6 +48,15 @@ class CleanupViewModel extends ChangeNotifier {
   ];
   int get selectedBytes => selected.fold(0, (s, j) => s + j.bytes);
 
+  /// Locations labelled Safe. Offered by "Clean safe junk…", which only
+  /// opens the confirmation; nothing here is selected.
+  List<MeasuredJunk> get safe => [
+    for (final junk in found ?? const <MeasuredJunk>[])
+      if (junk.target.risk == JunkRisk.safe) junk,
+  ];
+  int get totalBytes =>
+      (found ?? const <MeasuredJunk>[]).fold(0, (s, j) => s + j.bytes);
+
   List<MeasuredJunk> inGroup(JunkGroup group) => [
     for (final junk in found ?? const <MeasuredJunk>[])
       if (junk.target.group == group) junk,
@@ -122,8 +131,13 @@ class CleanupViewModel extends ChangeNotifier {
     _notify();
   }
 
-  Future<List<RemovalOutcome>> clean({RemovalMode? override}) async {
-    final items = [for (final junk in selected) junk.item];
+  /// Removes [only] when given (the items the user just confirmed),
+  /// otherwise the current selection.
+  Future<List<RemovalOutcome>> clean({
+    RemovalMode? override,
+    List<MeasuredJunk>? only,
+  }) async {
+    final items = [for (final junk in only ?? selected) junk.item];
     if (busy || items.isEmpty) return const [];
     cleaning = true;
     progressDone = 0;

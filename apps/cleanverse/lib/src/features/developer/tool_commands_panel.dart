@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:cleanverse/src/app/theme.dart';
-import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/features/developer/tool_commands.dart';
 
 /// Package-manager caches cleaned through each tool's own command, after a
@@ -97,17 +96,6 @@ class _ToolCommandsPanelState extends State<ToolCommandsPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: CvSpace.lg),
-        const Row(
-          children: [
-            Icon(Icons.inventory_2_outlined, size: 18, color: CvColors.violet),
-            SizedBox(width: CvSpace.sm),
-            Text(
-              'Package manager caches',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
         const Text(
           'Cleaned by each tool\'s own command. Installed packages and projects are not touched.',
           style: TextStyle(color: CvColors.muted, fontSize: 12),
@@ -140,6 +128,13 @@ class _ToolCommandsPanelState extends State<ToolCommandsPanel> {
                                 fontSize: 12,
                               ),
                             ),
+                            SelectableText(
+                              t.cleanCommand,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -156,11 +151,11 @@ class _ToolCommandsPanelState extends State<ToolCommandsPanel> {
                           child: Text('Clean ${t.label}'),
                         )
                       else
-                        StatusChip(
+                        Text(
                           current[t] == ToolStatus.failed
                               ? 'Did not respond'
                               : 'Not installed',
-                          color: CvColors.muted,
+                          style: const TextStyle(color: CvColors.muted),
                         ),
                     ],
                   ),
