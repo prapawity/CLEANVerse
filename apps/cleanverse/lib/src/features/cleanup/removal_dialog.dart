@@ -50,66 +50,82 @@ Future<({RemovalMode? override, bool dryRun})?> confirmRemoval(
           title: Text(title),
           content: SizedBox(
             width: 620,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${plural(items.length, 'item')} · ${formatBytes(total)} observed',
-                    style: Theme.of(context).textTheme.titleMedium,
+            // Bounded height so the item list can be lazy; every item is
+            // still listed and reachable by scrolling.
+            height: (MediaQuery.sizeOf(context).height * .7).clamp(
+              240.0,
+              640.0,
+            ),
+            child: Scrollbar(
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${plural(items.length, 'item')} · ${formatBytes(total)} observed',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: CvSpace.md),
+                        if (!allowModeChoice)
+                          Text(
+                            'Everything is moved to the $bin, so you can put it back. '
+                            'Space is freed after you empty the $bin.',
+                          )
+                        else
+                          RadioGroup<ModeChoice>(
+                            groupValue: choice,
+                            onChanged: (value) =>
+                                setState(() => choice = value ?? choice),
+                            child: Column(
+                              children: [
+                                RadioListTile<ModeChoice>(
+                                  value: ModeChoice.recommended,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Recommended for each item',
+                                  ),
+                                  subtitle: Text(
+                                    '$permanentCount rebuildable caches deleted permanently; '
+                                    'the rest moved to the $bin.',
+                                  ),
+                                ),
+                                RadioListTile<ModeChoice>(
+                                  value: ModeChoice.trash,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text('Move everything to the $bin'),
+                                  subtitle: Text(
+                                    'Can be restored. Space is freed only after you empty the $bin.',
+                                  ),
+                                ),
+                                RadioListTile<ModeChoice>(
+                                  value: ModeChoice.permanent,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Delete everything permanently',
+                                  ),
+                                  subtitle: const Text(
+                                    'Frees space now. Cannot be undone.',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (permanent > 0)
+                          Callout(
+                            '$permanent ${permanent == 1 ? 'item' : 'items'} will be deleted permanently and cannot be restored.',
+                            tone: CalloutTone.caution,
+                          ),
+                        for (final warning in warnings)
+                          Callout(warning, tone: CalloutTone.caution),
+                        const Divider(height: 24),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: CvSpace.md),
-                  if (!allowModeChoice)
-                    Text(
-                      'Everything is moved to the $bin, so you can put it back. '
-                      'Space is freed after you empty the $bin.',
-                    )
-                  else
-                    RadioGroup<ModeChoice>(
-                      groupValue: choice,
-                      onChanged: (value) =>
-                          setState(() => choice = value ?? choice),
-                      child: Column(
-                        children: [
-                          RadioListTile<ModeChoice>(
-                            value: ModeChoice.recommended,
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Recommended for each item'),
-                            subtitle: Text(
-                              '$permanentCount rebuildable caches deleted permanently; '
-                              'the rest moved to the $bin.',
-                            ),
-                          ),
-                          RadioListTile<ModeChoice>(
-                            value: ModeChoice.trash,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text('Move everything to the $bin'),
-                            subtitle: Text(
-                              'Can be restored. Space is freed only after you empty the $bin.',
-                            ),
-                          ),
-                          RadioListTile<ModeChoice>(
-                            value: ModeChoice.permanent,
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Delete everything permanently'),
-                            subtitle: const Text(
-                              'Frees space now. Cannot be undone.',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (permanent > 0)
-                    Callout(
-                      '$permanent ${permanent == 1 ? 'item' : 'items'} will be deleted permanently and cannot be restored.',
-                      tone: CalloutTone.caution,
-                    ),
-                  for (final warning in warnings)
-                    Callout(warning, tone: CalloutTone.caution),
-                  const Divider(height: 24),
-                  for (var i = 0; i < items.length; i++)
-                    Padding(
+                  SliverList.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, i) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,6 +168,7 @@ Future<({RemovalMode? override, bool dryRun})?> confirmRemoval(
                         ],
                       ),
                     ),
+                  ),
                 ],
               ),
             ),

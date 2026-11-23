@@ -33,6 +33,10 @@ class UninstallViewModel extends ChangeNotifier {
   AppSort sort = AppSort.name;
   int _sizeRun = 0;
 
+  /// Size order captured when the user picks "Size" while sizes are still
+  /// being measured, so rows don't jump around. Cleared when measuring ends.
+  Map<String, int>? _frozenOrder;
+
   bool loadingApps = false;
   bool loadingLeftovers = false;
   bool removing = false;
@@ -58,7 +62,15 @@ class UninstallViewModel extends ChangeNotifier {
     ];
     int byName(InstalledApp a, InstalledApp b) =>
         a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    if (sort == AppSort.size) {
+    final frozen = _frozenOrder;
+    if (sort == AppSort.size && frozen != null) {
+      list.sort((a, b) {
+        final c = (frozen[a.path] ?? 1 << 30).compareTo(
+          frozen[b.path] ?? 1 << 30,
+        );
+        return c != 0 ? c : byName(a, b);
+      });
+    } else if (sort == AppSort.size) {
       // Measured apps first, biggest first; unmeasured keep name order.
       list.sort((a, b) {
         final sa = appSizes[a.path];
@@ -77,6 +89,13 @@ class UninstallViewModel extends ChangeNotifier {
 
   void setSort(AppSort value) {
     sort = value;
+    _frozenOrder = null;
+    if (value == AppSort.size && measuringSizes) {
+      final ordered = visibleApps;
+      _frozenOrder = {
+        for (var i = 0; i < ordered.length; i++) ordered[i].path: i,
+      };
+    }
     _notify();
   }
 
@@ -112,6 +131,7 @@ class UninstallViewModel extends ChangeNotifier {
     ]);
     if (run == _sizeRun) {
       measuringSizes = false;
+      _frozenOrder = null;
       _notify();
     }
   }
