@@ -55,7 +55,11 @@ class CleanupPage extends StatelessWidget {
     required this.model,
     required this.onNavigate,
     this.settings,
+    this.fullDiskAccess,
   });
+
+  /// macOS only; null hides the banner (other platforms and tests).
+  final Widget? fullDiskAccess;
   final CleanupViewModel model;
   final ValueChanged<Section> onNavigate;
   final AppSettings? settings;
@@ -98,6 +102,7 @@ class CleanupPage extends StatelessWidget {
             title: 'Clean up',
             subtitle: 'Find temporary files, browser caches and developer caches that are safe to rebuild.',
           ),
+          ?fullDiskAccess,
           Panel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

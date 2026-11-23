@@ -32,6 +32,7 @@ From the market gap analysis (CleanMyMac, DaisyDisk, StorageRadar, WizTree, WinD
 - Done 2026-11-23: per-item risk labels (Safe / Caution / Risky) in Clean up, with explanation tooltip, screen-reader text and a confirmation warning for Risky items.
 - Now: verify risk labels and the cleanup flow on real Windows, macOS and Linux builds.
 - Done 2026-11-23: official clean commands for Homebrew (`brew cleanup`, with `--dry-run` preview), npm (`npm cache clean --force`) and pub (`dart pub cache clean --force`) in Developer, each behind a confirmation showing the exact command. Verified read-only commands on macOS; clean commands only tested with fake runners.
-- Next: macOS Full Disk Access onboarding, scan history with "what grew", wider developer cache catalog.
+- Done 2026-11-23: macOS distribution decision (owner): direct distribution, App Sandbox removed so Clean up, Docker and tool commands can reach user caches; not eligible for the Mac App Store as-is. Optional Full Disk Access banner in Clean up (detects denied access by probing protected paths, opens System Settings, dismissible).
+- Next: scan history with "what grew", wider developer cache catalog.
 - Later: app uninstaller, scheduled checks and low-disk alerts with tray icon, similar-photo detection, cloud storage cleanup, CLI.
-- Distribution: code signing and notarization, winget and Homebrew; avoid the Mac App Store sandbox for developer caches.
+- Distribution: Developer ID signing with hardened runtime and notarization (required now that the sandbox is off), winget and Homebrew; avoid the Mac App Store sandbox for developer caches.

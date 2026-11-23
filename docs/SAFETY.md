@@ -35,3 +35,9 @@ The owner approved user-confirmed removal on desktop. Implemented in `apps/clean
 - Junk locations are limited to the user's own profile; no administrator rights. Browser cleanup touches cache folders only, not cookies, history or passwords.
 
 Verified: unit tests with temporary fixtures, and a read-only junk check on Windows 11. Not yet verified: macOS and Linux trash, cloud-synced folders, network volumes, and real-world removal on any OS.
+
+## macOS sandbox decision (2026-11-23)
+
+The owner chose direct distribution for macOS. The App Sandbox entitlement is removed from Debug and Release builds, so the app runs with the user's own file permissions (no elevation). Consequences: the Mac App Store is not a target as-is; every removal still goes through the confirmation and re-checks above; release builds need Developer ID signing, hardened runtime and notarization.
+
+Full Disk Access is optional. CLEANVerse detects that it is missing by listing or opening protected paths (TCC database, Safari, Mail) without keeping any contents, and shows a dismissible banner that opens System Settings. Granting it never selects or removes anything. Verified: the build has no sandbox entitlement and the check reports denied from a Terminal without access. Not yet verified: the granted path in the app itself, and real cleanup on macOS.

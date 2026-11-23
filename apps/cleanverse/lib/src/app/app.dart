@@ -1,3 +1,5 @@
+import 'dart:io';
+
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import 'package:cleanverse/src/features/example/demo_scan.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:cleanverse/src/data/protection.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_page.dart';
+import 'package:cleanverse/src/features/cleanup/full_disk_access_banner.dart';
 import 'package:cleanverse/src/features/developer/developer_page.dart';
 import 'package:cleanverse/src/features/scan/duplicates_page.dart';
 import 'package:cleanverse/src/features/example/example_page.dart';
@@ -128,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
       model: cleanup,
       onNavigate: _go,
       settings: settings,
+      fullDiskAccess: Platform.isMacOS ? const FullDiskAccessBanner() : null,
     ),
     Section.spaceLens => SpaceLensPage(model: scan, onNavigate: _go),
     Section.largeFiles => LargeFilesPage(
