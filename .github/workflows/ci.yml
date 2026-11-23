@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: apps/cleanverse
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -63,7 +63,7 @@ jobs:
         working-directory: apps/cleanverse
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -75,7 +75,7 @@ jobs:
       - run: flutter build ${{ matrix.target }} --release
       - name: Upload test build
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CLEANVerse-${{ matrix.target }}-pr${{ github.event.pull_request.number }}
           path: apps/cleanverse/${{ matrix.output }}
@@ -90,7 +90,7 @@ jobs:
       run:
         working-directory: apps/cleanverse
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -99,7 +99,7 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows
       - name: Upload untested Windows preview
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: CLEANVerse-Windows-untested-${{ github.sha }}
           path: apps/cleanverse/build/windows/x64/runner/Release/
