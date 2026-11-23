@@ -263,6 +263,7 @@ class UninstallViewModel extends ChangeNotifier {
             for (final a in apps ?? const <InstalledApp>[])
               if (a.path != app.path) a,
           ];
+          appSizes.remove(app.path);
           _notify();
         }
       }

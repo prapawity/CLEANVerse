@@ -183,6 +183,9 @@ void main() {
     final count = model.selected.length;
     final outcomes = await model.remove(override: RemovalMode.permanent);
     expect(trash.moved.length, count);
+    // The removed app no longer counts towards the Apps total.
+    expect(model.apps, isEmpty);
+    expect(model.appSizes.containsKey(p.join(apps, 'Notely.app')), isFalse);
     expect(outcomes.every((o) => o.mode == RemovalMode.trash), isTrue);
     // Files are untouched by the fake Trash, so nothing was deleted.
     expect(Directory(p.join(apps, 'Notely.app')).existsSync(), isTrue);

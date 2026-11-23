@@ -390,9 +390,10 @@ void main() {
         await measure.releaseAll(tester);
         await tester.tap(find.textContaining('App 060'));
         await tester.pumpAndSettle();
+        // Paths are shortened in the middle; the tooltip holds the full one.
         await scrollTo(
           tester,
-          find.text('/Library/LaunchDaemons/com.example.daemon2.plist'),
+          find.byTooltip('/Library/LaunchDaemons/com.example.daemon2.plist'),
         );
         expect(tester.takeException(), isNull);
       });

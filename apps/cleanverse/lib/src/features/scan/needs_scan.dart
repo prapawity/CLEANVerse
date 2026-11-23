@@ -1,7 +1,6 @@
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/app/theme.dart';
@@ -82,92 +81,5 @@ class StorageScroll extends StatelessWidget {
         ],
       );
     },
-  );
-}
-
-/// One-line path with ellipsis, the full path in a tooltip, and a copy
-/// action. The path goes to the local clipboard only.
-class PathLine extends StatelessWidget {
-  const PathLine(this.path, {super.key});
-  final String path;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Flexible(
-        child: Tooltip(
-          message: path,
-          waitDuration: const Duration(milliseconds: 400),
-          child: MiddleEllipsisText(
-            path,
-            style: const TextStyle(color: CvColors.muted, fontSize: 12),
-          ),
-        ),
-      ),
-      IconButton(
-        tooltip: 'Copy path',
-        visualDensity: VisualDensity.compact,
-        iconSize: 16,
-        icon: const Icon(Icons.copy_rounded, color: CvColors.muted),
-        onPressed: () async {
-          await Clipboard.setData(ClipboardData(text: path));
-          if (!context.mounted) return;
-          ScaffoldMessenger.maybeOf(context)
-              ?.showSnackBar(const SnackBar(content: Text('Path copied')));
-        },
-      ),
-    ],
-  );
-}
-
-/// Quiet "Show N more" button under a bounded list.
-class ShowMoreButton extends StatelessWidget {
-  const ShowMoreButton({
-    super.key,
-    required this.remaining,
-    required this.onPressed,
-    this.step = 50,
-  });
-  final int remaining;
-  final int step;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: CvSpace.md),
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton(
-        onPressed: onPressed,
-        child: Text(
-          'Show ${remaining < step ? remaining : step} more of $remaining',
-        ),
-      ),
-    ),
-  );
-}
-
-/// Pinned selection bar: one sentence and one primary action.
-class SelectionBar extends StatelessWidget {
-  const SelectionBar({
-    super.key,
-    required this.summary,
-    required this.actionLabel,
-    required this.onAction,
-  });
-  final String summary;
-  final String actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: CvSpace.lg,
-    runSpacing: CvSpace.sm,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    alignment: WrapAlignment.spaceBetween,
-    children: [
-      Text(summary, style: const TextStyle(fontWeight: FontWeight.w600)),
-      FilledButton(onPressed: onAction, child: Text(actionLabel)),
-    ],
   );
 }

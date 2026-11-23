@@ -118,7 +118,7 @@ class _SpaceLensPageState extends State<SpaceLensPage> {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    PathLine(model.root!),
+                    PathLine(model.root!, copy: true),
                   ],
                 ),
               ),

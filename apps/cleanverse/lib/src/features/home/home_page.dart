@@ -120,6 +120,7 @@ class HomePage extends StatelessWidget {
     final home = model.homeFolder();
     final scannedHome =
         result != null &&
+        !result.cancelled &&
         !model.busy &&
         home != null &&
         model.root != null &&
@@ -317,7 +318,7 @@ class _Start extends StatelessWidget {
             ),
           )
         else if (supported && home != null)
-          OneLinePath(
+          PathLine(
             home,
             prefix: 'Scans ',
             style: const TextStyle(color: CvColors.muted, fontSize: 12),
@@ -358,7 +359,7 @@ class _Progress extends StatelessWidget {
         ),
         const SizedBox(height: CvSpace.sm),
         if (model.root != null)
-          OneLinePath(
+          PathLine(
             model.root!,
             prefix: 'Folder: ',
             style: const TextStyle(color: CvColors.muted),

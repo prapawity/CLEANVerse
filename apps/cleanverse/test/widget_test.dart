@@ -130,9 +130,13 @@ class LiveFolderScanner implements FolderScanner {
   }
 }
 
-class _NoVolumes extends VolumeReader {
+class FakeVolumes extends VolumeReader {
+  int calls = 0;
   @override
-  Future<List<Volume>> list() async => const [];
+  Future<List<Volume>> list() async {
+    calls++;
+    return const [];
+  }
 }
 
 class _NoApps extends AppCatalog {
@@ -147,6 +151,7 @@ Future<void> pumpApp(
   FolderScanner scanner, {
   Size size = const Size(1400, 1000),
   CleanupViewModel? cleanup,
+  FakeVolumes? volumes,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -159,7 +164,7 @@ Future<void> pumpApp(
       pickFolder: () async => 'chosen',
       homeFolder: () => 'home',
       cleanup: cleanup ?? CleanupViewModel(loader: () async => const []),
-      volumes: VolumesModel(reader: _NoVolumes()),
+      volumes: VolumesModel(reader: volumes ?? FakeVolumes()),
       uninstall: UninstallViewModel(catalog: _NoApps()),
     ),
   );
@@ -497,5 +502,14 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('found so far'), findsNothing);
+  });
+
+  testWidgets('drive sizes refresh when coming back to Home', (tester) async {
+    final volumes = FakeVolumes();
+    await pumpApp(tester, FakeFolderScanner(), volumes: volumes);
+    final before = volumes.calls;
+    await openSection(tester, 'Clean up');
+    await openSection(tester, 'Home');
+    expect(volumes.calls, before + 1);
   });
 }

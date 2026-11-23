@@ -274,13 +274,15 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
         bottomBar: result.files.isEmpty
             ? null
             : SelectionBar(
-                summary: selected.isEmpty
+                status: selected.isEmpty
                     ? 'Select files to remove'
                     : '${plural(selected.length, 'file')} selected · ${formatBytes(selectedBytes)}',
-                actionLabel: 'Move to ${trashName()}…',
-                onAction: selected.isEmpty || busy
-                    ? null
-                    : () => _remove(result.files),
+                action: FilledButton(
+                  onPressed: selected.isEmpty || busy
+                      ? null
+                      : () => _remove(result.files),
+                  child: Text('Move to ${trashName()}…'),
+                ),
               ),
       );
     },
@@ -326,7 +328,7 @@ class _FileRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                PathLine(file.path),
+                PathLine(file.path, copy: true),
               ],
             ),
           ),

@@ -112,7 +112,7 @@ class SettingsPage extends StatelessWidget {
                           color: CvColors.muted,
                         ),
                         const SizedBox(width: CvSpace.sm),
-                        Expanded(child: OneLinePath(path)),
+                        Expanded(child: PathLine(path)),
                         TextButton(
                           onPressed: () => settings.unignorePath(path),
                           child: const Text('Remove'),
@@ -348,7 +348,7 @@ class _HistorySectionState extends State<_HistorySection> {
                           '${e.label} · ${_statusText(e)}',
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        OneLinePath(
+                        PathLine(
                           '${formatDate(e.time)} ${e.time.hour.toString().padLeft(2, '0')}:${e.time.minute.toString().padLeft(2, '0')} · ${e.path}',
                           style: const TextStyle(
                             color: CvColors.muted,

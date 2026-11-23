@@ -165,6 +165,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _go(Section value) {
     if (value == section) return;
     setState(() => section = value);
+    // Free space changes after cleaning or uninstalling; refresh on Home.
+    if (value == Section.home) volumes.load();
   }
 
   @override
@@ -602,7 +604,7 @@ class _TopBar extends StatelessWidget {
                   ),
                   const SizedBox(width: CvSpace.md),
                   Flexible(
-                    child: OneLinePath(
+                    child: PathLine(
                       scope,
                       prefix: wide ? 'Scope: ' : '',
                       style: const TextStyle(

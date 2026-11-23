@@ -11,7 +11,6 @@ import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/data/removal.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_page.dart'
     show RiskChip;
-import 'package:cleanverse/src/features/cleanup/list_parts.dart';
 import 'package:cleanverse/src/features/cleanup/removal_dialog.dart';
 import 'package:cleanverse/src/features/uninstall/app_catalog.dart';
 import 'package:cleanverse/src/features/uninstall/uninstall_view_model.dart';
@@ -196,7 +195,7 @@ class _UninstallPageState extends State<UninstallPage> {
             ),
           ],
         ),
-        PathText(app.path),
+        PathLine(app.path),
         const SizedBox(height: CvSpace.lg),
         if (loading) ...[
           const Text('Looking for files this app left behind…'),
@@ -264,7 +263,7 @@ class _UninstallPageState extends State<UninstallPage> {
               itemCount: model.systemWide.length,
               itemBuilder: (context, i) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
-                child: PathText(model.systemWide[i].path),
+                child: PathLine(model.systemWide[i].path),
               ),
             ),
           ],
@@ -408,7 +407,7 @@ class _LeftoverRow extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
-                    PathText(l.path),
+                    PathLine(l.path),
                   ],
                 ),
               ),

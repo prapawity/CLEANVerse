@@ -10,7 +10,6 @@ import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_view_model.dart';
 import 'package:cleanverse/src/features/cleanup/junk_catalog.dart';
-import 'package:cleanverse/src/features/cleanup/list_parts.dart';
 import 'package:cleanverse/src/features/cleanup/removal_dialog.dart';
 import 'package:cleanverse/src/features/settings/app_settings.dart';
 
@@ -524,7 +523,7 @@ class _JunkRow extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
-                    PathText(target.path),
+                    PathLine(target.path),
                   ],
                 ),
               ),

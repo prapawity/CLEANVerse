@@ -261,13 +261,15 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
         bottomBar: groups.isEmpty
             ? null
             : SelectionBar(
-                summary: selected.isEmpty
+                status: selected.isEmpty
                     ? 'Select copies to remove'
                     : '${plural(selected.length, 'copy', 'copies')} selected · ${formatBytes(selectedBytes)}',
-                actionLabel: 'Move to ${trashName()}…',
-                onAction: selected.isEmpty || model.busy
-                    ? null
-                    : () => _remove(groups),
+                action: FilledButton(
+                  onPressed: selected.isEmpty || model.busy
+                      ? null
+                      : () => _remove(groups),
+                  child: Text('Move to ${trashName()}…'),
+                ),
               ),
       );
     },
@@ -357,7 +359,7 @@ class _Group extends StatelessWidget {
                         : null,
                     semanticLabel: 'Select copy ${file.path}',
                   ),
-                  Expanded(child: PathLine(file.path)),
+                  Expanded(child: PathLine(file.path, copy: true)),
                   if (!isSelected(file) && !canSelect(file))
                     const Padding(
                       padding: EdgeInsets.only(left: CvSpace.sm),

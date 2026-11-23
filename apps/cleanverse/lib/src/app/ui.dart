@@ -3,6 +3,7 @@ import 'dart:math' as math;
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:cleanverse/src/app/theme.dart';
@@ -399,17 +400,124 @@ class MiddleEllipsisText extends StatelessWidget {
   );
 }
 
-class OneLinePath extends StatelessWidget {
-  const OneLinePath(this.path, {super.key, this.prefix = '', this.style});
+/// A path on one line: shortened in the middle so the file name stays
+/// visible, the full path in a tooltip and in screen-reader text, and an
+/// optional copy button.
+class PathLine extends StatelessWidget {
+  const PathLine(
+    this.path, {
+    super.key,
+    this.prefix = '',
+    this.style = const TextStyle(color: CvColors.muted, fontSize: 12),
+    this.copy = false,
+  });
   final String path;
   final String prefix;
   final TextStyle? style;
+  final bool copy;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: path,
-    waitDuration: const Duration(milliseconds: 500),
-    child: MiddleEllipsisText('$prefix$path', style: style),
+  Widget build(BuildContext context) {
+    final text = Tooltip(
+      message: path,
+      waitDuration: const Duration(milliseconds: 400),
+      child: MiddleEllipsisText('$prefix$path', style: style),
+    );
+    if (!copy) return text;
+    return Row(
+      children: [
+        Flexible(child: text),
+        IconButton(
+          tooltip: 'Copy path',
+          visualDensity: VisualDensity.compact,
+          iconSize: 16,
+          icon: const Icon(Icons.copy_rounded, color: CvColors.muted),
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: path));
+            if (!context.mounted) return;
+            ScaffoldMessenger.maybeOf(context)
+                ?.showSnackBar(const SnackBar(content: Text('Path copied')));
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Size figure aligned at the end of a row.
+class SizeText extends StatelessWidget {
+  const SizeText(this.text, {super.key, this.muted = false});
+  final String text;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    textAlign: TextAlign.end,
+    style: TextStyle(
+      fontWeight: FontWeight.w600,
+      fontFeatures: const [FontFeature.tabularFigures()],
+      color: muted ? CvColors.muted : CvColors.text,
+    ),
+  );
+}
+
+/// Thin divider between list rows, instead of a box around each row.
+const rowDivider = Divider(
+  height: 1,
+  thickness: 1,
+  color: CvColors.outlineSoft,
+);
+
+/// Quiet "Show N more" button under a bounded list.
+class ShowMoreButton extends StatelessWidget {
+  const ShowMoreButton({
+    super.key,
+    required this.remaining,
+    required this.onPressed,
+    this.step = 50,
+  });
+  final int remaining;
+  final int step;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: CvSpace.md),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        onPressed: onPressed,
+        child: Text(
+          'Show ${remaining < step ? remaining : step} more of $remaining',
+        ),
+      ),
+    ),
+  );
+}
+
+/// Pinned action bar content: a status sentence and one action.
+class SelectionBar extends StatelessWidget {
+  const SelectionBar({super.key, required this.status, required this.action});
+  final String status;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: CvSpace.lg,
+    runSpacing: CvSpace.sm,
+    alignment: WrapAlignment.spaceBetween,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Semantics(
+        liveRegion: true,
+        child: Text(
+          status,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+      action,
+    ],
   );
 }
 

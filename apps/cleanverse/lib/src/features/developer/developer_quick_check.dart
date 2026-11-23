@@ -3,10 +3,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show listEquals;
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+
+import 'package:cleanverse/src/app/ui.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:cleanverse/src/app/theme.dart';
-import 'package:cleanverse/src/features/cleanup/list_parts.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 
 /// Checks known locations only. It does not traverse, calculate sizes or delete.
@@ -126,7 +127,7 @@ class _DeveloperQuickCheckState extends State<DeveloperQuickCheck> {
                   folder.category,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                PathText(folder.path),
+                PathLine(folder.path),
                 Text(
                   folder.locationSource ?? 'Possible location',
                   style: const TextStyle(color: CvColors.muted, fontSize: 12),

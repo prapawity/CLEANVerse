@@ -13,7 +13,6 @@ import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/data/removal.dart';
-import 'package:cleanverse/src/features/cleanup/list_parts.dart';
 import 'package:cleanverse/src/features/cleanup/removal_dialog.dart';
 import 'package:cleanverse/src/features/developer/cleanup_plan.dart';
 import 'package:cleanverse/src/features/developer/default_scan.dart';
@@ -400,7 +399,7 @@ class _ScanSummary extends StatelessWidget {
             '${result.cancelled ? ' (scan stopped early)' : ''}.',
             style: const TextStyle(color: CvColors.muted),
           ),
-          if (model.root != null) PathText(model.root!, prefix: 'Scanned '),
+          if (model.root != null) PathLine(model.root!, prefix: 'Scanned '),
           const SizedBox(height: CvSpace.xs),
           const Text(
             'Sizes are logical bytes scanned, may be incomplete and are not '
@@ -530,7 +529,7 @@ class _DevFolderRow extends StatelessWidget {
                       folder.category,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    PathText(folder.path),
+                    PathLine(folder.path),
                     if (folder.projectMarker != null)
                       Text(
                         'Project marker: ${folder.projectMarker}',
