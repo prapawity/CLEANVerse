@@ -25,6 +25,24 @@ enum JunkGroup {
   final String description;
 }
 
+/// How much care a location needs before cleaning. Shown on every item so
+/// the user can judge it; it never selects anything.
+enum JunkRisk {
+  safe('Safe', 'Rebuilt automatically. Nothing you made is stored here.'),
+  caution(
+    'Caution',
+    'Rebuilt or re-downloaded, but an app may need closing, run slower once, or need network access.',
+  ),
+  risky(
+    'Risky',
+    'May hold data that cannot be rebuilt. Moved to the bin by default; review before cleaning.',
+  );
+
+  const JunkRisk(this.label, this.explanation);
+  final String label;
+  final String explanation;
+}
+
 /// A known junk location. Every path is derived from the user's own
 /// profile; nothing requires administrator rights.
 class JunkTarget {
@@ -37,6 +55,7 @@ class JunkTarget {
     this.recommended = RemovalMode.permanent,
     this.keepNames = const {},
     this.closeApp,
+    this.risk = JunkRisk.safe,
   });
   final JunkGroup group;
   final String label;
@@ -48,6 +67,8 @@ class JunkTarget {
 
   /// App that should be closed first, if any.
   final String? closeApp;
+
+  final JunkRisk risk;
 
   RemovalItem toItem(int bytes) => RemovalItem(
     path: path,
@@ -110,7 +131,8 @@ Future<List<JunkTarget>> junkTargets(
         group: JunkGroup.system,
         label: 'User app caches',
         path: p.join(home, 'Library', 'Caches'),
-        note: 'Caches apps rebuild when needed. Browser and developer caches are listed separately.',
+        note: 'Caches apps rebuild when needed. Some apps may sign in again or re-download offline content. Browser and developer caches are listed separately.',
+        risk: JunkRisk.caution,
         keepNames: const {
           'Google',
           'com.microsoft.edgemac',
@@ -133,7 +155,8 @@ Future<List<JunkTarget>> junkTargets(
         group: JunkGroup.system,
         label: 'User app caches',
         path: cache,
-        note: 'Caches apps rebuild when needed. Browser and developer caches are listed separately.',
+        note: 'Caches apps rebuild when needed. Some apps may sign in again or re-download offline content. Browser and developer caches are listed separately.',
+        risk: JunkRisk.caution,
         keepNames: const {
           'google-chrome',
           'microsoft-edge',
@@ -164,6 +187,7 @@ Future<List<JunkTarget>> junkTargets(
             path: p.join(profile, folder),
             note: 'Pages may load slower once. You stay signed in.',
             closeApp: app,
+            risk: JunkRisk.caution,
           ),
         );
       }
@@ -179,6 +203,7 @@ Future<List<JunkTarget>> junkTargets(
           path: p.join(profile, 'cache2'),
           note: 'Pages may load slower once. You stay signed in.',
           closeApp: 'Firefox',
+          risk: JunkRisk.caution,
         ),
       );
     }
@@ -225,6 +250,8 @@ Future<List<JunkTarget>> junkTargets(
         scope: RemovalScope.whole,
         // Possibly unique data (e.g. Xcode archives) goes to Trash.
         recommended: important ? RemovalMode.trash : RemovalMode.permanent,
+        // Re-downloads need network and time; archives may be unique.
+        risk: important ? JunkRisk.risky : JunkRisk.caution,
       ),
     );
   }

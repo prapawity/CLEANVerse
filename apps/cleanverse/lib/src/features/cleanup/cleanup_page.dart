@@ -16,6 +16,38 @@ IconData _groupIcon(JunkGroup group) => switch (group) {
   JunkGroup.developer => Icons.code_rounded,
 };
 
+Color riskColor(JunkRisk risk) => switch (risk) {
+  JunkRisk.safe => CvColors.mint,
+  JunkRisk.caution => CvColors.amber,
+  JunkRisk.risky => CvColors.rose,
+};
+
+IconData _riskIcon(JunkRisk risk) => switch (risk) {
+  JunkRisk.safe => Icons.check_circle_outline_rounded,
+  JunkRisk.caution => Icons.info_outline_rounded,
+  JunkRisk.risky => Icons.warning_amber_rounded,
+};
+
+/// Risk label with its explanation as a tooltip and screen-reader text.
+class RiskChip extends StatelessWidget {
+  const RiskChip(this.risk, {super.key});
+  final JunkRisk risk;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: risk.explanation,
+    child: Semantics(
+      label: 'Risk: ${risk.label}. ${risk.explanation}',
+      excludeSemantics: true,
+      child: StatusChip(
+        risk.label,
+        color: riskColor(risk),
+        icon: _riskIcon(risk),
+      ),
+    ),
+  );
+}
+
 /// One-click junk check across known cache locations, then a reviewed clean.
 class CleanupPage extends StatelessWidget {
   const CleanupPage({
@@ -30,6 +62,10 @@ class CleanupPage extends StatelessWidget {
 
   Future<void> _clean(BuildContext context) async {
     final selected = model.selected;
+    final risky = [
+      for (final junk in selected)
+        if (junk.target.risk == JunkRisk.risky) junk.target.label,
+    ];
     final apps = {
       for (final junk in selected)
         if (junk.target.closeApp != null) junk.target.closeApp!,
@@ -39,6 +75,9 @@ class CleanupPage extends StatelessWidget {
       title: 'Clean selected junk',
       items: [for (final junk in selected) junk.item],
       warnings: [
+        if (risky.isNotEmpty)
+          'Risky: ${risky.join(', ')} may hold data that cannot be rebuilt. '
+              'Keep them in the bin until you are sure.',
         if (apps.isNotEmpty)
           'Close ${apps.join(', ')} first. Caches in use are skipped.',
       ],
@@ -227,7 +266,15 @@ class _GroupSection extends StatelessWidget {
                       : (value) => model.toggle(junk, value ?? false),
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: const EdgeInsets.only(left: 8),
-                  title: Text(junk.target.label),
+                  title: Wrap(
+                    spacing: CvSpace.sm,
+                    runSpacing: CvSpace.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(junk.target.label),
+                      RiskChip(junk.target.risk),
+                    ],
+                  ),
                   subtitle: Text(
                     '${junk.target.note}\n${junk.target.path}',
                     style: const TextStyle(color: CvColors.muted, fontSize: 12),

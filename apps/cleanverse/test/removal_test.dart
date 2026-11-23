@@ -162,6 +162,27 @@ void main() {
     );
   });
 
+  test('catalog labels risk per location', () async {
+    final local = p.join(sandbox.path, 'Local');
+    await file('Local/Google/Chrome/User Data/Default/Cache/x', 1);
+    final targets = await junkTargets(
+      {'USERPROFILE': sandbox.path, 'LOCALAPPDATA': local},
+      windows: true,
+      macos: false,
+    );
+    JunkTarget byLabel(String label) =>
+        targets.firstWhere((t) => t.label == label);
+    expect(byLabel('Temporary files').risk, JunkRisk.safe);
+    expect(byLabel('Chrome · Default · Cache').risk, JunkRisk.caution);
+    for (final t in targets.where((t) => t.group == JunkGroup.developer)) {
+      expect(t.risk, isNot(JunkRisk.safe));
+      // Risky items are never deleted permanently by default.
+      if (t.risk == JunkRisk.risky) {
+        expect(t.recommended, RemovalMode.trash);
+      }
+    }
+  });
+
   test('dry run changes nothing and reports what would happen', () async {
     final f = await file('cache/a.bin', 100);
     final cache = p.join(sandbox.path, 'cache');

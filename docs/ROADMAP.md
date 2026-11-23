@@ -29,7 +29,8 @@ A platform is supported only after its build, permissions, accessibility, failur
 From the market gap analysis (CleanMyMac, DaisyDisk, StorageRadar, WizTree, WinDirStat, BleachBit, Czkawka, Mole, npkill, ClearDisk). Done: signed GitHub Releases auto-update, settings persistence, feature-based layout.
 
 - Done 2026-11-22: dry-run preview in every removal dialog, local removal history (Settings), ignore list enforced by the removal engine, git-status and 7-day activity guard on project folders, Docker status/start/prune via official commands.
-- Now: per-item risk labels (Safe / Caution / Risky) in Clean up.
+- Done 2026-11-23: per-item risk labels (Safe / Caution / Risky) in Clean up, with explanation tooltip, screen-reader text and a confirmation warning for Risky items.
+- Now: verify risk labels and the cleanup flow on real Windows, macOS and Linux builds.
 - Next: more official clean commands (brew/npm/pub), macOS Full Disk Access onboarding, scan history with "what grew", wider developer cache catalog.
 - Later: app uninstaller, scheduled checks and low-disk alerts with tray icon, similar-photo detection, cloud storage cleanup, CLI.
 - Distribution: code signing and notarization, winget and Homebrew; avoid the Mac App Store sandbox for developer caches.

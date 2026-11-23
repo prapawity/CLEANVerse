@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/features/cleanup/cleanup_view_model.dart';
+import 'package:cleanverse/src/features/cleanup/cleanup_page.dart';
+import 'package:cleanverse/src/features/cleanup/junk_catalog.dart';
 import 'package:cleanverse/src/features/example/demo_scan.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 import 'package:cleanverse/src/features/developer/developer_page.dart';
@@ -310,6 +312,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nothing to clean'), findsOneWidget);
     expect(find.text('Select what to clean'), findsOneWidget);
+  });
+
+  testWidgets('risk chips show label and explanation', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [for (final r in JunkRisk.values) RiskChip(r)],
+          ),
+        ),
+      ),
+    );
+    for (final r in JunkRisk.values) {
+      expect(find.text(r.label), findsOneWidget);
+      expect(find.byTooltip(r.explanation), findsOneWidget);
+    }
   });
 
   test('formatBytes uses binary units', () {
