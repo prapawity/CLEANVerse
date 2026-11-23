@@ -29,6 +29,7 @@ class LargeFolderScanner implements FolderScanner {
     bool findDuplicates = false,
     bool findDevFolders = false,
     void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
   }) async => FolderScanResult(
     [
       for (var i = 0; i < files; i++)

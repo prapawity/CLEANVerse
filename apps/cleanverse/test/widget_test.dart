@@ -29,6 +29,7 @@ class FakeFolderScanner implements FolderScanner {
     bool findDuplicates = false,
     bool findDevFolders = false,
     void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
   }) async {
     scans++;
     paths.add(path);
@@ -84,8 +85,44 @@ class PendingFolderScanner implements FolderScanner {
     bool findDuplicates = false,
     bool findDevFolders = false,
     void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
   }) {
     onProgress?.call(const ScanProgress(ScanPhase.comparing, 20, 2, 4));
+    return completion.future;
+  }
+}
+
+/// Sends one "results so far" snapshot, then waits until completed.
+class LiveFolderScanner implements FolderScanner {
+  final completion = Completer<FolderScanResult>();
+  @override
+  Future<FolderScanResult> scan(
+    String path,
+    bool Function() cancelled, {
+    List<String> exclusions = const [],
+    bool findDuplicates = false,
+    bool findDevFolders = false,
+    void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
+  }) {
+    onProgress?.call(const ScanProgress(ScanPhase.discovering, 500, 0, 0));
+    onPartial?.call(
+      const FolderScanResult(
+        [LargeFile('home/Movies/holiday.mov', 3 * 1024 * 1024 * 1024)],
+        0,
+        false,
+        filesSeen: 500,
+        totalBytes: 5 * 1024 * 1024 * 1024,
+        folderSummaries: [
+          FolderSummary(
+            'home/Movies',
+            4 * 1024 * 1024 * 1024,
+            10,
+            folderPath: 'home/Movies',
+          ),
+        ],
+      ),
+    );
     return completion.future;
   }
 }
@@ -428,5 +465,20 @@ void main() {
     await openSection(tester, 'Home');
     await openSection(tester, 'Storage');
     expect(find.text('Oldest first'), findsOneWidget);
+  });
+
+  testWidgets('Home shows results so far while scanning', (tester) async {
+    final scanner = LiveFolderScanner();
+    await pumpApp(tester, scanner);
+    await tester.tap(find.text('Scan now'));
+    await tester.pump();
+    expect(find.text('5.0 GiB found so far'), findsOneWidget);
+    expect(find.text('holiday.mov'), findsOneWidget);
+    expect(find.text('Movies'), findsOneWidget);
+    scanner.completion.complete(
+      const FolderScanResult([], 0, false, filesSeen: 500),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('found so far'), findsNothing);
   });
 }

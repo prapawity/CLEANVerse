@@ -151,6 +151,7 @@ class BigDevScanner implements FolderScanner {
     bool findDuplicates = false,
     bool findDevFolders = false,
     void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
   }) async {
     lastPath = path;
     lastFindDev = findDevFolders;

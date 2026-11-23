@@ -3,6 +3,7 @@ import 'dart:io';
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/app/theme.dart';
@@ -319,6 +320,7 @@ class _Progress extends StatelessWidget {
         Semantics(liveRegion: true, child: Text(folderStatus)),
         const SizedBox(height: CvSpace.xs),
         Text(junkStatus, style: const TextStyle(color: CvColors.muted)),
+        if (model.live != null && folderBusy) _SoFar(result: model.live!),
         const SizedBox(height: CvSpace.xl),
         Wrap(
           spacing: CvSpace.md,
@@ -343,6 +345,75 @@ class _Progress extends StatelessWidget {
       ],
     );
   }
+}
+
+/// What the scan has found so far: updates every couple of seconds.
+class _SoFar extends StatelessWidget {
+  const _SoFar({required this.result});
+  final FolderScanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final files = result.files.take(5).toList();
+    final folders = [
+      for (final f in result.folderSummaries)
+        if (f.folderPath != null) f,
+    ].take(3).toList();
+    return Padding(
+      padding: const EdgeInsets.only(top: CvSpace.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${formatBytes(result.totalBytes)} found so far',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+          ),
+          if (folders.isNotEmpty) ...[
+            const SizedBox(height: CvSpace.md),
+            const Text(
+              'Biggest folders so far',
+              style: TextStyle(color: CvColors.muted, fontSize: 12),
+            ),
+            for (final f in folders)
+              _SoFarRow(label: p.basename(f.label), bytes: f.bytes),
+          ],
+          if (files.isNotEmpty) ...[
+            const SizedBox(height: CvSpace.md),
+            const Text(
+              'Biggest files so far',
+              style: TextStyle(color: CvColors.muted, fontSize: 12),
+            ),
+            for (final f in files)
+              _SoFarRow(label: p.basename(f.path), bytes: f.bytes),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SoFarRow extends StatelessWidget {
+  const _SoFarRow({required this.label, required this.bytes});
+  final String label;
+  final int bytes;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      children: [
+        Expanded(child: MiddleEllipsisText(label)),
+        const SizedBox(width: CvSpace.md),
+        Text(
+          formatBytes(bytes),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _Findings extends StatelessWidget {
