@@ -328,6 +328,77 @@ class Swatch extends StatelessWidget {
 
 /// A path on one line, cut with an ellipsis when it does not fit. The full
 /// path is in the tooltip.
+/// One line of text that, when too long, keeps the start and the end and
+/// puts "…" in the middle, so a path keeps its file name visible.
+class MiddleEllipsisText extends StatelessWidget {
+  const MiddleEllipsisText(this.text, {super.key, this.style});
+  final String text;
+  final TextStyle? style;
+
+  static String fit(
+    String text,
+    double maxWidth,
+    TextStyle style,
+    TextScaler scaler,
+    TextDirection direction,
+  ) {
+    bool fits(String value) {
+      final painter = TextPainter(
+        text: TextSpan(text: value, style: style),
+        maxLines: 1,
+        textDirection: direction,
+        textScaler: scaler,
+      )..layout();
+      final ok = painter.width <= maxWidth;
+      painter.dispose();
+      return ok;
+    }
+
+    if (!maxWidth.isFinite || fits(text)) return text;
+    // Largest number of kept characters that fits, split ~40/60 so the
+    // end (file name) gets more room.
+    var low = 0;
+    var high = text.length;
+    String build(int keep) {
+      final head = (keep * .4).floor();
+      final tail = keep - head;
+      return '${text.substring(0, head)}…${text.substring(text.length - tail)}';
+    }
+
+    while (low < high) {
+      final mid = (low + high + 1) ~/ 2;
+      if (fits(build(mid))) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return build(low);
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final effective = DefaultTextStyle.of(context).style.merge(style);
+      final shown = fit(
+        text,
+        constraints.maxWidth,
+        effective,
+        MediaQuery.textScalerOf(context),
+        Directionality.of(context),
+      );
+      return Text(
+        shown,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.clip,
+        style: style,
+        semanticsLabel: text,
+      );
+    },
+  );
+}
+
 class OneLinePath extends StatelessWidget {
   const OneLinePath(this.path, {super.key, this.prefix = '', this.style});
   final String path;
@@ -338,13 +409,7 @@ class OneLinePath extends StatelessWidget {
   Widget build(BuildContext context) => Tooltip(
     message: path,
     waitDuration: const Duration(milliseconds: 500),
-    child: Text(
-      '$prefix$path',
-      maxLines: 1,
-      softWrap: false,
-      overflow: TextOverflow.ellipsis,
-      style: style,
-    ),
+    child: MiddleEllipsisText('$prefix$path', style: style),
   );
 }
 

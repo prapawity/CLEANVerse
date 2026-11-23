@@ -98,10 +98,8 @@ class PathLine extends StatelessWidget {
         child: Tooltip(
           message: path,
           waitDuration: const Duration(milliseconds: 400),
-          child: Text(
+          child: MiddleEllipsisText(
             path,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: CvColors.muted, fontSize: 12),
           ),
         ),
