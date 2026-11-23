@@ -111,3 +111,94 @@ class WhatGrewCard extends StatelessWidget {
     );
   }
 }
+
+/// Compact "What grew" section for the Storage Folders tab.
+/// Renders nothing unless a comparison exists.
+class WhatGrewSection extends StatefulWidget {
+  const WhatGrewSection({super.key, required this.comparison});
+  final ScanComparison? comparison;
+
+  @override
+  State<WhatGrewSection> createState() => _WhatGrewSectionState();
+}
+
+class _WhatGrewSectionState extends State<WhatGrewSection> {
+  static const _top = 5;
+  bool expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.comparison;
+    if (c == null) return const SizedBox.shrink();
+    final root = c.current.root;
+    final rows = expanded ? c.grew : c.grew.take(_top).toList();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: CvSpace.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'What grew since ${_date(c.previous.time)}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              Text(
+                _signed(c.totalDelta),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: c.totalDelta > 0 ? CvColors.amber : CvColors.mint,
+                ),
+              ),
+            ],
+          ),
+          if (c.approximate)
+            const Text(
+              'Approximate: some folders were skipped in one of the scans.',
+              style: TextStyle(color: CvColors.muted, fontSize: 12),
+            ),
+          const SizedBox(height: CvSpace.xs),
+          if (c.grew.isEmpty)
+            const Text(
+              'No folder grew.',
+              style: TextStyle(color: CvColors.muted),
+            )
+          else
+            for (final g in rows)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Tooltip(
+                        message: g.path,
+                        child: Text(
+                          '${p.isWithin(root, g.path) ? p.relative(g.path, from: root) : g.path}'
+                          '${g.isNew ? ' (new)' : ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: CvSpace.sm),
+                    Text(
+                      _signed(g.delta),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+          if (c.grew.length > _top)
+            TextButton(
+              onPressed: () => setState(() => expanded = !expanded),
+              child: Text(
+                expanded ? 'Show fewer' : 'Show all ${c.grew.length}',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

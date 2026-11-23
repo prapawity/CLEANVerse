@@ -13,22 +13,22 @@ Status: 2026-11-22. Describes the implemented desktop Flutter flow and the refer
 
 Common expectations across these tools: a single obvious "Scan" starting point, real progress, a summary in plain sizes, drill-down from big to small, filters for size and age, and a review step before any action.
 
-## Implemented flow
+## Implemented flow (redesign 2026-11-23, see `UX_REDESIGN.md`)
 
 ```
-Smart Scan ── choose folder + options ──▶ progress (real counts, cancel keeps partial)
-     │
-     ▼
-Scan summary (status chip, totals, skipped count)
- ├─ Space Lens ........ largest folders (Explore → rescan inside, Back) + file types
- ├─ Large & old files . 100 largest, filter 50 MiB+ / older than a year, sort by size or age
- ├─ Duplicates ........ SHA-256 groups; "Turn on and scan again" if not included
- ├─ What grew ......... opt-in history; growth since the previous scan of this folder
- └─ Developer ......... quick check + project/tool candidates → select → review dialog
-Example scan ......... fixed sample data, never touches files
+Home ── Scan now (home folder, no picker; junk check in parallel) ──▶ one progress view, Cancel keeps partial
+  │        "Choose another folder…" is a quiet secondary link
+  ▼
+Findings, biggest first, one action each:
+  Junk you can clean up ........ Clean up
+  Your biggest files ........... Storage (Biggest files | Folders | Duplicates)
+  Developer storage ............ Developer (Pro tools)
+  What grew since <date> ....... Storage → Folders (history opt-in)
+  Apps you no longer use ....... Apps (macOS)
+Settings → Try with sample data (former Example scan)
 ```
 
-One `FolderScanViewModel` lives in `HomeScreen` and feeds every page, so a single scan populates all review areas. Navigation is a grouped sidebar (Scan / Review / Tools / Learn) at 900 px and wider, and a scrollable chip row below that. Badges show result counts after a scan.
+Menu: Home, Clean up, Storage, Apps (macOS), Pro tools → Developer, Settings. One `FolderScanViewModel` feeds Home and Storage; pages own their scrolling with lazy lists and pinned selection bars.
 
 ## Rules carried into the UI
 
@@ -40,7 +40,7 @@ One `FolderScanViewModel` lives in `HomeScreen` and feeds every page, so a singl
 
 ## Next steps
 
-1. Verify the new layout on real Windows, macOS and Linux builds, at 200% text and with a screen reader.
+1. Verify the redesigned layout on real Windows, macOS and Linux builds, at 200% text and with a screen reader; measure a real home-folder scan.
 2. Persist exclusions and options (explicit opt-in).
 3. Add an interactive treemap for Space Lens once the list version is validated.
 4. Design the recoverable Move to Trash flow (per-item outcomes, keep-one-copy guard for duplicates) before enabling it.

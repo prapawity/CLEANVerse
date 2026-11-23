@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:cleanverse/src/app/app.dart';
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/data/protection.dart';
 import 'package:cleanverse/src/features/settings/app_settings.dart';
 import 'package:cleanverse/src/data/removal.dart';
@@ -16,11 +17,23 @@ import 'package:cleanverse/src/features/scan/smart_scan_page.dart';
 
 enum LargeFileFilter { all, large, old }
 
-enum LargeFileSort { size, oldest }
+enum LargeFileSort { size, smallest, oldest, newest, name }
 
 /// Files not modified for this long count as "old". Modification time is
 /// used because last-opened time is unreliable across platforms.
 const oldFileAge = Duration(days: 365);
+
+/// Rows shown at first and added by each "Show more".
+const largeFilesPageSize = 50;
+
+String _age(DateTime? modified, DateTime now) {
+  if (modified == null) return 'Unknown age';
+  final days = now.difference(modified).inDays;
+  if (days < 1) return 'Today';
+  if (days < 31) return '${plural(days, 'day')} old';
+  if (days < 365) return '${plural(days ~/ 30, 'month')} old';
+  return '${plural(days ~/ 365, 'year')} old';
+}
 
 class LargeFilesPage extends StatefulWidget {
   const LargeFilesPage({
@@ -43,7 +56,13 @@ class LargeFilesPage extends StatefulWidget {
 
 class _LargeFilesPageState extends State<LargeFilesPage> {
   LargeFileFilter filter = LargeFileFilter.all;
-  LargeFileSort sort = LargeFileSort.size;
+  late LargeFileSort sort = rememberedSort(
+    context,
+    'largeFiles',
+    LargeFileSort.size,
+  );
+  String query = '';
+  int shown = largeFilesPageSize;
   final Set<String> selected = {};
 
   Future<void> _remove(List<LargeFile> files) async {
@@ -75,11 +94,13 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
     await model.rescan();
   }
 
-  List<LargeFile> _visible(List<LargeFile> files) {
-    final now = (widget.now ?? DateTime.now)();
+  List<LargeFile> _visible(List<LargeFile> files, DateTime now) {
     final ignored = activeIgnoreList;
     final list = files.where((file) {
       if (ignored?.covers(file.path) ?? false) return false;
+      if (!matchesQuery(query, [p.basename(file.path), file.path])) {
+        return false;
+      }
       return switch (filter) {
         LargeFileFilter.all => true,
         LargeFileFilter.large => file.bytes >= largeFileThreshold,
@@ -87,144 +108,182 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
           file.modified != null && now.difference(file.modified!) >= oldFileAge,
       };
     }).toList();
-    if (sort == LargeFileSort.oldest) {
-      list.sort((a, b) {
-        final am = a.modified, bm = b.modified;
-        if (am == null && bm == null) return b.bytes.compareTo(a.bytes);
-        if (am == null) return 1;
-        if (bm == null) return -1;
-        return am.compareTo(bm);
-      });
+    int bySize(LargeFile a, LargeFile b) => b.bytes.compareTo(a.bytes);
+    int byDate(LargeFile a, LargeFile b, {required bool oldest}) {
+      final am = a.modified, bm = b.modified;
+      if (am == null && bm == null) return bySize(a, b);
+      if (am == null) return 1; // unknown age goes last either way
+      if (bm == null) return -1;
+      final c = oldest ? am.compareTo(bm) : bm.compareTo(am);
+      return c != 0 ? c : bySize(a, b);
+    }
+
+    switch (sort) {
+      case LargeFileSort.size:
+        list.sort(bySize);
+      case LargeFileSort.smallest:
+        list.sort((a, b) => a.bytes.compareTo(b.bytes));
+      case LargeFileSort.oldest:
+        list.sort((a, b) => byDate(a, b, oldest: true));
+      case LargeFileSort.newest:
+        list.sort((a, b) => byDate(a, b, oldest: false));
+      case LargeFileSort.name:
+        list.sort(
+          (a, b) => p
+              .basename(a.path)
+              .toLowerCase()
+              .compareTo(p.basename(b.path).toLowerCase()),
+        );
     }
     return list;
   }
+
+  Widget _controls() => ListToolbar<LargeFileSort>(
+    hint: 'Search by name or folder',
+    initialQuery: query,
+    onQuery: (v) => setState(() {
+      query = v;
+      shown = largeFilesPageSize;
+    }),
+    sort: sort,
+    sortOptions: const [
+      SortOption(LargeFileSort.size, 'Largest first'),
+      SortOption(LargeFileSort.smallest, 'Smallest first'),
+      SortOption(LargeFileSort.oldest, 'Oldest first'),
+      SortOption(LargeFileSort.newest, 'Newest first'),
+      SortOption(LargeFileSort.name, 'Name A to Z'),
+    ],
+    onSort: (v) => setState(() {
+      sort = v;
+      rememberSort(context, 'largeFiles', v);
+      shown = largeFilesPageSize;
+    }),
+    trailing: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<LargeFileFilter>(
+        segments: const [
+          ButtonSegment(value: LargeFileFilter.all, label: Text('All')),
+          ButtonSegment(value: LargeFileFilter.large, label: Text('50 MiB+')),
+          ButtonSegment(
+            value: LargeFileFilter.old,
+            label: Text('Older than a year'),
+          ),
+        ],
+        selected: {filter},
+        showSelectedIcon: false,
+        onSelectionChanged: (value) => setState(() {
+          filter = value.first;
+          shown = largeFilesPageSize;
+        }),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.model,
     builder: (context, _) {
-      const header = PageHeader(
-        title: 'Large & old files',
-        subtitle: 'The biggest files in this scope, so you can decide what to keep, move or archive.',
-      );
       final gate = needsScan(
         widget.model,
         widget.onNavigate,
         icon: Icons.inventory_outlined,
         title: 'No files to review yet',
       );
-      if (gate != null) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [header, gate],
-        );
-      }
+      if (gate != null) return StorageScroll(header: [gate]);
+      final now = (widget.now ?? DateTime.now)();
       final result = widget.model.result!;
-      final visible = _visible(result.files);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          header,
-          const Callout(
-            'Showing up to 100 largest files. "Old" means not modified for a year; '
-            'it is not a last-opened date. Nothing is selected for you.',
+      final visible = _visible(result.files, now);
+      final count = visible.length < shown ? visible.length : shown;
+      final busy = widget.model.busy;
+      final selectedBytes = result.files
+          .where((f) => selected.contains(f.path))
+          .fold<int>(0, (s, f) => s + f.bytes);
+      return StorageScroll(
+        header: [
+          Text(
+            '${plural(visible.length, 'file')} · '
+            '${formatBytes(visible.fold<int>(0, (s, f) => s + f.bytes))}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: CvSpace.xs),
+          const Text(
+            'The largest files in this scan. Age is the last change, not the last time you opened it.',
+            style: TextStyle(color: CvColors.muted, fontSize: 13),
           ),
           if (result.cancelled || result.skipped > 0)
-            const Callout(
-              'This list may be incomplete because the scan was cancelled or items were skipped.',
-              tone: CalloutTone.caution,
+            const Padding(
+              padding: EdgeInsets.only(top: CvSpace.sm),
+              child: Callout(
+                'This list may be incomplete because the scan was cancelled or items were skipped.',
+                tone: CalloutTone.caution,
+              ),
             ),
-          Wrap(
-            spacing: CvSpace.md,
-            runSpacing: CvSpace.md,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SegmentedButton<LargeFileFilter>(
-                  segments: const [
-                    ButtonSegment(
-                      value: LargeFileFilter.all,
-                      label: Text('All'),
-                    ),
-                    ButtonSegment(
-                      value: LargeFileFilter.large,
-                      label: Text('50 MiB+'),
-                    ),
-                    ButtonSegment(
-                      value: LargeFileFilter.old,
-                      label: Text('Older than a year'),
-                    ),
-                  ],
-                  selected: {filter},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (value) =>
-                      setState(() => filter = value.first),
-                ),
-              ),
-              DropdownButton<LargeFileSort>(
-                value: sort,
-                underline: const SizedBox.shrink(),
-                borderRadius: BorderRadius.circular(CvRadius.sm),
-                items: const [
-                  DropdownMenuItem(
-                    value: LargeFileSort.size,
-                    child: Text('Sort: largest first'),
-                  ),
-                  DropdownMenuItem(
-                    value: LargeFileSort.oldest,
-                    child: Text('Sort: oldest first'),
-                  ),
-                ],
-                onChanged: (value) =>
-                    setState(() => sort = value ?? LargeFileSort.size),
-              ),
-            ],
+          const SizedBox(height: CvSpace.md),
+          _controls(),
+          MatchCount(
+            shown: visible.length,
+            total: result.files.length,
+            active: query.isNotEmpty || filter != LargeFileFilter.all,
           ),
-          const SizedBox(height: CvSpace.lg),
-          Text(
-            '${plural(visible.length, 'file')} · ${formatBytes(visible.fold<int>(0, (s, f) => s + f.bytes))}',
-            style: const TextStyle(color: CvColors.muted),
-          ),
-          const SizedBox(height: CvSpace.sm),
+          const SizedBox(height: CvSpace.md),
           if (result.files.isEmpty)
             const Text('No files found in the scanned scope.')
+          else if (visible.isEmpty && query.isNotEmpty)
+            NoMatches(query: query, onClear: () => setState(() => query = ''))
           else if (visible.isEmpty)
-            const EmptyState(
-              icon: Icons.filter_alt_off_outlined,
-              title: 'No files match this filter',
-              message: 'Try another filter to see more files.',
-            )
-          else
-            for (final file in visible)
-              _FileRow(
+            const Text(
+              'No files match this filter. Choose All to see every file.',
+              style: TextStyle(color: CvColors.muted),
+            ),
+        ],
+        slivers: [
+          SliverList.separated(
+            itemCount: count,
+            separatorBuilder: (_, _) =>
+                const Divider(height: 1, color: CvColors.outlineSoft),
+            itemBuilder: (context, i) {
+              final file = visible[i];
+              return _FileRow(
                 file: file,
+                age: _age(file.modified, now),
                 selected: selected.contains(file.path),
-                onIgnore: widget.settings == null || widget.model.busy
+                onIgnore: widget.settings == null || busy
                     ? null
                     : () async {
                         await widget.settings!.ignorePath(file.path);
                         setState(() => selected.remove(file.path));
                       },
-                onChanged: widget.model.busy
+                onChanged: busy
                     ? null
                     : (value) => setState(
                         () => value
                             ? selected.add(file.path)
                             : selected.remove(file.path),
                       ),
+              );
+            },
+          ),
+          if (visible.length > count)
+            SliverToBoxAdapter(
+              child: ShowMoreButton(
+                remaining: visible.length - count,
+                onPressed: () => setState(() => shown += largeFilesPageSize),
               ),
-          if (result.files.isNotEmpty)
-            _SelectionBar(
-              count: selected.length,
-              bytes: result.files
-                  .where((f) => selected.contains(f.path))
-                  .fold<int>(0, (s, f) => s + f.bytes),
-              onRemove: selected.isEmpty || widget.model.busy
-                  ? null
-                  : () => _remove(result.files),
             ),
         ],
+        bottomBar: result.files.isEmpty
+            ? null
+            : SelectionBar(
+                status: selected.isEmpty
+                    ? 'Select files to remove'
+                    : '${plural(selected.length, 'file')} selected · ${formatBytes(selectedBytes)}',
+                action: FilledButton(
+                  onPressed: selected.isEmpty || busy
+                      ? null
+                      : () => _remove(result.files),
+                  child: Text('Move to ${trashName()}…'),
+                ),
+              ),
       );
     },
   );
@@ -233,112 +292,72 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
 class _FileRow extends StatelessWidget {
   const _FileRow({
     required this.file,
+    required this.age,
     required this.selected,
     required this.onChanged,
     this.onIgnore,
   });
   final LargeFile file;
+  final String age;
   final bool selected;
   final ValueChanged<bool>? onChanged;
   final VoidCallback? onIgnore;
 
   @override
   Widget build(BuildContext context) {
-    final category = categoryForPath(file.path);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
-        child: Row(
-          children: [
-            Checkbox(
-              value: selected,
-              onChanged: onChanged == null
-                  ? null
-                  : (value) => onChanged!(value ?? false),
-              semanticLabel: 'Select ${p.basename(file.path)}',
+    final name = p.basename(file.path);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: CvSpace.xs),
+      child: Row(
+        children: [
+          Checkbox(
+            value: selected,
+            onChanged: onChanged == null
+                ? null
+                : (value) => onChanged!(value ?? false),
+            semanticLabel: 'Select $name',
+          ),
+          const SizedBox(width: CvSpace.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                PathLine(file.path, copy: true),
+              ],
             ),
-            Icon(iconForCategory(category), color: CvColors.violet),
-            const SizedBox(width: CvSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.basename(file.path),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  SelectableText(
-                    file.path,
-                    style: const TextStyle(color: CvColors.muted, fontSize: 12),
-                  ),
-                  Text(
-                    [
-                      category,
-                      if (file.modified != null)
-                        'Modified ${formatDate(file.modified!)}',
-                    ].join(' · '),
-                    style: const TextStyle(color: CvColors.muted, fontSize: 12),
-                  ),
-                ],
+          ),
+          const SizedBox(width: CvSpace.md),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                formatBytes(file.bytes),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
-            ),
-            const SizedBox(width: CvSpace.md),
-            Text(
-              formatBytes(file.bytes),
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            if (onIgnore != null)
-              IconButton(
-                tooltip: 'Ignore this file',
-                icon: const Icon(Icons.visibility_off_outlined),
-                onPressed: onIgnore,
+              Text(
+                age,
+                style: const TextStyle(color: CvColors.muted, fontSize: 12),
               ),
-          ],
-        ),
+            ],
+          ),
+          if (onIgnore != null)
+            IconButton(
+              tooltip: 'Ignore this file',
+              icon: const Icon(
+                Icons.visibility_off_outlined,
+                size: 18,
+                color: CvColors.muted,
+              ),
+              onPressed: onIgnore,
+            ),
+        ],
       ),
     );
   }
-}
-
-/// Sticky-style action bar for removing user-selected files.
-class _SelectionBar extends StatelessWidget {
-  const _SelectionBar({
-    required this.count,
-    required this.bytes,
-    required this.onRemove,
-  });
-  final int count;
-  final int bytes;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(top: CvSpace.md),
-    padding: const EdgeInsets.all(CvSpace.lg),
-    decoration: BoxDecoration(
-      color: CvColors.raised,
-      borderRadius: BorderRadius.circular(CvRadius.md),
-      border: Border.all(color: CvColors.outline),
-    ),
-    child: Wrap(
-      spacing: CvSpace.lg,
-      runSpacing: CvSpace.sm,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      alignment: WrapAlignment.spaceBetween,
-      children: [
-        Text(
-          count == 0
-              ? 'Select files to remove'
-              : '${plural(count, 'file')} selected · ${formatBytes(bytes)}',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        FilledButton.icon(
-          onPressed: onRemove,
-          icon: const Icon(Icons.delete_outline_rounded),
-          label: Text('Move to ${trashName()}'),
-        ),
-      ],
-    ),
-  );
 }

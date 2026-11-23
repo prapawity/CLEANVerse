@@ -41,12 +41,28 @@ class CleanupViewModel extends ChangeNotifier {
   int progressTotal = 0;
 
   bool get busy => scanning || cleaning;
+  bool _stopScan = false;
+
+  /// Stops measuring further locations; what was measured is kept.
+  void cancelScan() {
+    if (scanning) _stopScan = true;
+  }
+
   bool isSelected(MeasuredJunk junk) => _selected.contains(junk.target.path);
   List<MeasuredJunk> get selected => [
     for (final junk in found ?? const <MeasuredJunk>[])
       if (_selected.contains(junk.target.path)) junk,
   ];
   int get selectedBytes => selected.fold(0, (s, j) => s + j.bytes);
+
+  /// Locations labelled Safe. Offered by "Clean safe junk…", which only
+  /// opens the confirmation; nothing here is selected.
+  List<MeasuredJunk> get safe => [
+    for (final junk in found ?? const <MeasuredJunk>[])
+      if (junk.target.risk == JunkRisk.safe) junk,
+  ];
+  int get totalBytes =>
+      (found ?? const <MeasuredJunk>[]).fold(0, (s, j) => s + j.bytes);
 
   List<MeasuredJunk> inGroup(JunkGroup group) => [
     for (final junk in found ?? const <MeasuredJunk>[])
@@ -60,6 +76,7 @@ class CleanupViewModel extends ChangeNotifier {
   Future<void> scan({bool keepOutcomes = false}) async {
     if (busy) return;
     scanning = true;
+    _stopScan = false;
     error = null;
     if (!keepOutcomes) lastOutcomes = null;
     _selected.clear();
@@ -68,11 +85,12 @@ class CleanupViewModel extends ChangeNotifier {
       final targets = await loader();
       final measured = await Future.wait(
         targets.map((target) async {
+          if (_stopScan) return null;
           final type = await FileSystemEntity.type(
             target.path,
             followLinks: false,
           );
-          if (type != FileSystemEntityType.directory) return null;
+          if (type != FileSystemEntityType.directory || _stopScan) return null;
           final bytes = await measureBytes(
             target.path,
             skipNames: target.keepNames,
@@ -122,8 +140,13 @@ class CleanupViewModel extends ChangeNotifier {
     _notify();
   }
 
-  Future<List<RemovalOutcome>> clean({RemovalMode? override}) async {
-    final items = [for (final junk in selected) junk.item];
+  /// Removes [only] when given (the items the user just confirmed),
+  /// otherwise the current selection.
+  Future<List<RemovalOutcome>> clean({
+    RemovalMode? override,
+    List<MeasuredJunk>? only,
+  }) async {
+    final items = [for (final junk in only ?? selected) junk.item];
     if (busy || items.isEmpty) return const [];
     cleaning = true;
     progressDone = 0;

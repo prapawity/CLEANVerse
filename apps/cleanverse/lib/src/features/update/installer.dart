@@ -23,7 +23,11 @@ Future<InstallResult> installUpdate(UpdateAsset asset, File file) async {
   final exe = Platform.resolvedExecutable;
   if (Platform.isWindows && asset.kind == 'zip') {
     final installDir = p.dirname(exe);
-    if (!await _writable(installDir)) {
+    // The update replaces everything in the install folder, so only do it
+    // when that folder holds nothing but the app (for example, never when
+    // the app was unzipped straight into Downloads).
+    if (!await _writable(installDir) ||
+        !await holdsOnlyApp(installDir, p.basename(exe))) {
       await Process.start('explorer.exe', ['/select,', file.path]);
       return InstallResult.savedOnly;
     }
@@ -104,6 +108,26 @@ Future<bool> _writable(String directory) async {
     await probe.delete();
     return true;
   } catch (_) {
+    return false;
+  }
+}
+
+/// True when [dir] contains only the app's own files: its executable,
+/// DLLs next to it and the Flutter `data` folder. Anything else (a user's
+/// documents, other programs) means the folder is shared and must not be
+/// emptied by an update.
+Future<bool> holdsOnlyApp(String dir, String exeName) async {
+  try {
+    await for (final entry in Directory(dir).list(followLinks: false)) {
+      final name = p.basename(entry.path).toLowerCase();
+      final allowed =
+          name == exeName.toLowerCase() ||
+          (entry is Directory && name == 'data') ||
+          (entry is File && name.endsWith('.dll'));
+      if (!allowed) return false;
+    }
+    return true;
+  } on FileSystemException {
     return false;
   }
 }

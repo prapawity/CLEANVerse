@@ -3,6 +3,7 @@ import 'dart:math' as math;
 // Flutter's bundled Material library is used to avoid an extra UI dependency.
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:cleanverse/src/app/theme.dart';
@@ -323,5 +324,277 @@ class Swatch extends StatelessWidget {
       color: color,
       borderRadius: BorderRadius.circular(3),
     ),
+  );
+}
+
+/// A path on one line, cut with an ellipsis when it does not fit. The full
+/// path is in the tooltip.
+/// One line of text that, when too long, keeps the start and the end and
+/// puts "…" in the middle, so a path keeps its file name visible.
+class MiddleEllipsisText extends StatelessWidget {
+  const MiddleEllipsisText(this.text, {super.key, this.style});
+  final String text;
+  final TextStyle? style;
+
+  static String fit(
+    String text,
+    double maxWidth,
+    TextStyle style,
+    TextScaler scaler,
+    TextDirection direction,
+  ) {
+    bool fits(String value) {
+      final painter = TextPainter(
+        text: TextSpan(text: value, style: style),
+        maxLines: 1,
+        textDirection: direction,
+        textScaler: scaler,
+      )..layout();
+      final ok = painter.width <= maxWidth;
+      painter.dispose();
+      return ok;
+    }
+
+    if (!maxWidth.isFinite || fits(text)) return text;
+    // Largest number of kept characters that fits, split ~40/60 so the
+    // end (file name) gets more room.
+    var low = 0;
+    var high = text.length;
+    String build(int keep) {
+      final head = (keep * .4).floor();
+      final tail = keep - head;
+      return '${text.substring(0, head)}…${text.substring(text.length - tail)}';
+    }
+
+    while (low < high) {
+      final mid = (low + high + 1) ~/ 2;
+      if (fits(build(mid))) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return build(low);
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final effective = DefaultTextStyle.of(context).style.merge(style);
+      final shown = fit(
+        text,
+        constraints.maxWidth,
+        effective,
+        MediaQuery.textScalerOf(context),
+        Directionality.of(context),
+      );
+      return Text(
+        shown,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.clip,
+        style: style,
+        semanticsLabel: text,
+      );
+    },
+  );
+}
+
+/// A path on one line: shortened in the middle so the file name stays
+/// visible, the full path in a tooltip and in screen-reader text, and an
+/// optional copy button.
+class PathLine extends StatelessWidget {
+  const PathLine(
+    this.path, {
+    super.key,
+    this.prefix = '',
+    this.style = const TextStyle(color: CvColors.muted, fontSize: 12),
+    this.copy = false,
+  });
+  final String path;
+  final String prefix;
+  final TextStyle? style;
+  final bool copy;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Tooltip(
+      message: path,
+      waitDuration: const Duration(milliseconds: 400),
+      child: MiddleEllipsisText('$prefix$path', style: style),
+    );
+    if (!copy) return text;
+    return Row(
+      children: [
+        Flexible(child: text),
+        IconButton(
+          tooltip: 'Copy path',
+          visualDensity: VisualDensity.compact,
+          iconSize: 16,
+          icon: const Icon(Icons.copy_rounded, color: CvColors.muted),
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: path));
+            if (!context.mounted) return;
+            ScaffoldMessenger.maybeOf(context)
+                ?.showSnackBar(const SnackBar(content: Text('Path copied')));
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Size figure aligned at the end of a row.
+class SizeText extends StatelessWidget {
+  const SizeText(this.text, {super.key, this.muted = false});
+  final String text;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    textAlign: TextAlign.end,
+    style: TextStyle(
+      fontWeight: FontWeight.w600,
+      fontFeatures: const [FontFeature.tabularFigures()],
+      color: muted ? CvColors.muted : CvColors.text,
+    ),
+  );
+}
+
+/// Thin divider between list rows, instead of a box around each row.
+const rowDivider = Divider(
+  height: 1,
+  thickness: 1,
+  color: CvColors.outlineSoft,
+);
+
+/// Quiet "Show N more" button under a bounded list.
+class ShowMoreButton extends StatelessWidget {
+  const ShowMoreButton({
+    super.key,
+    required this.remaining,
+    required this.onPressed,
+    this.step = 50,
+  });
+  final int remaining;
+  final int step;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: CvSpace.md),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        onPressed: onPressed,
+        child: Text(
+          'Show ${remaining < step ? remaining : step} more of $remaining',
+        ),
+      ),
+    ),
+  );
+}
+
+/// Pinned action bar content: a status sentence and one action.
+class SelectionBar extends StatelessWidget {
+  const SelectionBar({super.key, required this.status, required this.action});
+  final String status;
+  final Widget action;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: CvSpace.lg,
+    runSpacing: CvSpace.sm,
+    alignment: WrapAlignment.spaceBetween,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Semantics(
+        liveRegion: true,
+        child: Text(
+          status,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+      action,
+    ],
+  );
+}
+
+/// Page body that owns its scrolling. The shell gives each page the full
+/// content area; pages put lazy lists in [slivers] and keep selection
+/// actions in [bottomBar], which stays visible. Content is centered at
+/// [maxWidth] with responsive gutters.
+class PageScroll extends StatefulWidget {
+  const PageScroll({
+    super.key,
+    this.children = const [],
+    this.slivers = const [],
+    this.bottomBar,
+    this.maxWidth = 1080,
+  });
+
+  /// Simple, short content placed before [slivers].
+  final List<Widget> children;
+  final List<Widget> slivers;
+  final Widget? bottomBar;
+  final double maxWidth;
+
+  @override
+  State<PageScroll> createState() => _PageScrollState();
+}
+
+class _PageScrollState extends State<PageScroll> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final wide = constraints.maxWidth >= 900;
+      final gutter = wide ? 40.0 : 16.0;
+      final side = ((constraints.maxWidth - widget.maxWidth) / 2).clamp(
+        gutter,
+        double.infinity,
+      );
+      return Column(
+        children: [
+          Expanded(
+            child: Scrollbar(
+              controller: _controller,
+              child: CustomScrollView(
+                controller: _controller,
+                slivers: [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(side, wide ? 32 : 20, side, 0),
+                    sliver: SliverList.list(children: widget.children),
+                  ),
+                  for (final sliver in widget.slivers)
+                    SliverPadding(
+                      padding: EdgeInsets.symmetric(horizontal: side),
+                      sliver: sliver,
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 48)),
+                ],
+              ),
+            ),
+          ),
+          if (widget.bottomBar != null)
+            Container(
+              decoration: const BoxDecoration(
+                color: CvColors.sidebar,
+                border: Border(top: BorderSide(color: CvColors.outlineSoft)),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: side, vertical: 12),
+              child: widget.bottomBar,
+            ),
+        ],
+      );
+    },
   );
 }

@@ -14,70 +14,72 @@ class ExamplePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: model,
-    builder: (context, _) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (context, _) => PageScroll(
+      maxWidth: 760,
       children: [
         const PageHeader(
-          title: 'Explore an example',
+          title: 'Sample data',
           subtitle: 'See sample results without scanning your files.',
         ),
-        Panel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Callout(
-                'This preview uses example data only. It does not access or change files on your device.',
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Callout(
+              'This preview uses example data only. It does not access or change files on your device.',
+            ),
+            if (model.status == ScanStatus.scanning)
+              OutlinedButton(
+                onPressed: model.cancel,
+                child: const Text('Cancel preview'),
+              )
+            else
+              FilledButton.icon(
+                onPressed: model.start,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(
+                  model.status == ScanStatus.complete
+                      ? 'Run example again'
+                      : 'Show example results',
+                ),
               ),
-              if (model.status == ScanStatus.scanning)
-                OutlinedButton(
-                  onPressed: model.cancel,
-                  child: const Text('Cancel preview'),
-                )
-              else
-                OutlinedButton.icon(
-                  onPressed: model.start,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: Text(
-                    model.status == ScanStatus.complete
-                        ? 'Run example again'
-                        : 'Show example results',
-                  ),
+            if (model.error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  model.error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
-              if (model.error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    model.error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+              ),
+            if (model.status == ScanStatus.scanning)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: LinearProgressIndicator(),
+              ),
+            if (model.status == ScanStatus.complete) ...[
+              const SectionTitle(
+                'Example results',
+                detail: 'These are not files from your device.',
+              ),
+              for (final item in model.items)
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      iconForCategory(item.category),
+                      color: CvColors.violet,
                     ),
-                  ),
-                ),
-              if (model.status == ScanStatus.scanning)
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: LinearProgressIndicator(),
-                ),
-              if (model.status == ScanStatus.complete) ...[
-                const SectionTitle(
-                  'Example results',
-                  detail: 'These are not files from your device.',
-                ),
-                for (final item in model.items)
-                  Card(
-                    child: ListTile(
-                      leading: Icon(
-                        iconForCategory(item.category),
-                        color: CvColors.violet,
-                      ),
-                      title: Text(item.name),
-                      subtitle: Text(item.category),
-                      trailing: Text(item.size),
+                    title: Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    subtitle: Text(item.category),
+                    trailing: Text(item.size),
                   ),
-              ],
+                ),
             ],
-          ),
+          ],
         ),
       ],
     ),

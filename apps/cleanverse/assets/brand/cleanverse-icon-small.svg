@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="CLEANVerse app icon (16 and 32 px)">
+<title>CLEANVerse - Swept Orbit, simplified for 16 and 32 px</title>
+<defs>
+ <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2d45"/><stop offset="1" stop-color="#141626"/></linearGradient>
+ <clipPath id="front"><rect x="0" y="512" width="1024" height="512"/></clipPath>
+ <clipPath id="swept"><circle cx="512" cy="512" r="270"/></clipPath>
+</defs>
+<rect x="64" y="64" width="896" height="896" rx="200" fill="url(#tile)"/>
+<circle cx="512" cy="512" r="270" fill="#6b60a3"/>
+<g clip-path="url(#swept)" transform="rotate(-24 512 512)">
+ <rect x="200" y="470" width="640" height="320" fill="#c2a7f5"/>
+</g>
+<g transform="rotate(-24 512 512)">
+ <g clip-path="url(#front)">
+  <ellipse cx="512" cy="512" rx="370" ry="130" fill="none" stroke="#73d5fb" stroke-width="92"/>
+ </g>
+ <circle cx="882" cy="512" r="70" fill="#d9f6ff"/>
+</g>
+</svg>

@@ -1,7 +1,8 @@
 name: CI
 
-# Full checks on every pull request and on main. Work-branch pushes can use
-# "[preview-only]" in the commit message for a quick untested Windows build.
+# Full checks on every pull request and on main (once per change, no
+# duplicate push runs). A work-branch push with "[preview-only]" in the
+# commit message only rebuilds a Windows preview of already-tested code.
 # See docs/RELEASING.md.
 
 on:
@@ -21,8 +22,10 @@ env:
   FLUTTER_VERSION: '3.50.1'
 
 jobs:
+  # Full checks run once per change: on the pull request, and again on
+  # main after merging. Pushes to work branches don't duplicate them.
   checks:
-    if: ${{ !(github.event_name == 'push' && github.ref != 'refs/heads/main' && contains(github.event.head_commit.message, '[preview-only]')) }}
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:

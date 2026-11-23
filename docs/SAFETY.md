@@ -59,3 +59,11 @@ Implemented in `apps/cleanverse/lib/src/features/uninstall/`.
 - Launch agents are moved to the Trash but not unloaded; they stop after logout/restart.
 
 Verified: unit tests with temporary fixtures and fake plutil/ps/Trash; read-only listing and leftover search on the developer's macOS machine. Not yet verified: real Trash moves of app bundles (including App Store apps owned by root, which may prompt for a password), protected containers on recent macOS, and vendor-folder data that is not named by bundle id.
+
+## Audit fixes (2026-11-23)
+
+- **Links are never moved to the Trash.** Finder (and likely the Windows Recycle Bin for junctions) acts on what a link points to, so trashing a link inside a cache folder moved its target, for example a personal folder, to the Trash. This was confirmed with temporary fixtures on macOS. Folder-content cleaning now skips links, and every Trash backend refuses a link path as a second guard. Tests: `test/removal_links_test.dart`.
+- **Windows self-update only replaces a folder that holds nothing but the app** (the exe, its DLLs and `data`). If the app runs from a shared folder such as Downloads, the update is saved for the user instead of emptying that folder. Test: `test/installer_guard_test.dart`.
+- macOS Trash moves are batched (one `osascript` call per 200 items) and still report each item.
+
+Note: the macOS Trash tests move small temporary files into the developer's Trash when run locally.

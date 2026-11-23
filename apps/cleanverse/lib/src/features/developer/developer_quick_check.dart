@@ -3,10 +3,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show listEquals;
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+
+import 'package:cleanverse/src/app/ui.dart';
 import 'package:path/path.dart' as p;
 
-import 'package:cleanverse/src/features/developer/tool_commands_panel.dart';
-import 'package:cleanverse/src/features/developer/docker_panel.dart';
+import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
 
 /// Checks known locations only. It does not traverse, calculate sizes or delete.
@@ -91,16 +92,15 @@ class _DeveloperQuickCheckState extends State<DeveloperQuickCheck> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const SizedBox(height: 14),
-      FilledButton.tonalIcon(
+      const SizedBox(height: CvSpace.sm),
+      OutlinedButton(
         onPressed: widget.enabled && !checking ? check : null,
-        icon: const Icon(Icons.bolt_outlined),
-        label: Text(checking ? 'Checking locations…' : 'Find tool caches'),
+        child: Text(checking ? 'Checking locations…' : 'Check known locations'),
       ),
       const SizedBox(height: 8),
       const Text(
-        'Checks known tool locations without scanning their contents. Sizes are not calculated. Project folders still need a folder scan.',
-        style: TextStyle(color: Color(0xffb2bfd4), fontSize: 12, height: 1.4),
+        'Checks known tool locations without scanning their contents or calculating sizes.',
+        style: TextStyle(color: CvColors.muted, fontSize: 12, height: 1.4),
       ),
       if (checking) ...[
         const SizedBox(height: 12),
@@ -127,26 +127,14 @@ class _DeveloperQuickCheckState extends State<DeveloperQuickCheck> {
                   folder.category,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                SelectableText(
-                  folder.path,
-                  style: const TextStyle(
-                    color: Color(0xffb2bfd4),
-                    fontSize: 12,
-                  ),
-                ),
+                PathLine(folder.path),
                 Text(
                   folder.locationSource ?? 'Possible location',
-                  style: const TextStyle(
-                    color: Color(0xffb2bfd4),
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(color: CvColors.muted, fontSize: 12),
                 ),
                 Text(
                   folder.note,
-                  style: const TextStyle(
-                    color: Color(0xffb2bfd4),
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(color: CvColors.muted, fontSize: 12),
                 ),
               ],
             ),
@@ -154,11 +142,9 @@ class _DeveloperQuickCheckState extends State<DeveloperQuickCheck> {
         const SizedBox(height: 12),
         const Text(
           'Locations are candidates, not proof of active settings. Nothing is deleted.',
-          style: TextStyle(color: Color(0xffb2bfd4), fontSize: 12, height: 1.4),
+          style: TextStyle(color: CvColors.muted, fontSize: 12, height: 1.4),
         ),
       ],
-      DockerPanel(enabled: widget.enabled),
-      ToolCommandsPanel(enabled: widget.enabled, windows: Platform.isWindows),
     ],
   );
 }

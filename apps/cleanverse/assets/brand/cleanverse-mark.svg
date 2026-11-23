@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="132 132 760 760" role="img" aria-label="CLEANVerse mark">
+<title>CLEANVerse - Swept Orbit mark</title>
+<defs>
+ <linearGradient id="planet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2d4ff"/><stop offset=".55" stop-color="#c2a7f5"/><stop offset="1" stop-color="#7a5fc4"/></linearGradient>
+ <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#73d5fb" stop-opacity=".3"/><stop offset=".5" stop-color="#73d5fb"/><stop offset="1" stop-color="#d9f6ff"/></linearGradient>
+ <clipPath id="front"><rect x="0" y="512" width="1024" height="512"/></clipPath>
+ <clipPath id="swept"><circle cx="512" cy="512" r="230"/></clipPath>
+</defs>
+<circle cx="512" cy="512" r="230" fill="#4f4778"/>
+<g clip-path="url(#swept)" transform="rotate(-24 512 512)">
+ <circle cx="450" cy="370" r="18" fill="#776ca6"/>
+ <circle cx="580" cy="340" r="13" fill="#776ca6"/>
+ <rect x="200" y="470" width="640" height="320" fill="url(#planet)"/>
+</g>
+<g transform="rotate(-24 512 512)">
+ <g clip-path="url(#front)">
+  <ellipse cx="512" cy="512" rx="340" ry="120" fill="none" stroke="url(#ring)" stroke-width="64" stroke-linecap="round"/>
+ </g>
+ <circle cx="852" cy="512" r="46" fill="#d9f6ff"/>
+</g>
+</svg>

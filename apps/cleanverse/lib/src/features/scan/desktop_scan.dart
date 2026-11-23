@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -674,6 +675,13 @@ Future<DevFolder?> classifyDevFolder(String path) async {
   return null;
 }
 
+class _WalkDir {
+  const _WalkDir(this.path, this.top, this.devFolders);
+  final String path;
+  final String? top;
+  final List<String> devFolders;
+}
+
 class _Candidate {
   const _Candidate(this.path, this.size, this.modified);
   final String path;
@@ -708,6 +716,7 @@ abstract interface class FolderScanner {
     bool findDuplicates = false,
     bool findDevFolders = false,
     void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
   });
 }
 
@@ -722,6 +731,17 @@ class LocalFolderScanner implements FolderScanner {
   final Map<String, String> environment;
   final bool windows;
   final bool macos;
+
+  /// Folders read at the same time.
+  static const parallelism = 8;
+
+  /// Developer folders recorded per scan. The Developer page lists them
+  /// lazily, so this only bounds memory on very large disks.
+  static const maxDevFolders = 1000;
+
+  /// How often [scan] reports results so far through `onPartial`.
+  static const partialInterval = Duration(milliseconds: 1500);
+
   @override
   Future<FolderScanResult> scan(
     String path,
@@ -730,6 +750,7 @@ class LocalFolderScanner implements FolderScanner {
     bool findDuplicates = false,
     bool findDevFolders = false,
     void Function(ScanProgress)? onProgress,
+    void Function(FolderScanResult partial)? onPartial,
   }) async {
     final excluded = exclusions
         .map((path) => p.normalize(p.absolute(path)))
@@ -748,7 +769,6 @@ class LocalFolderScanner implements FolderScanner {
         'Selected folder is unavailable or is a link.',
       );
     }
-    final pending = <Directory>[root];
     final files = <LargeFile>[];
     final candidates = <int, List<_Candidate>>{};
     var candidateCount = 0;
@@ -756,6 +776,10 @@ class LocalFolderScanner implements FolderScanner {
     final globalCaches = findDevFolders
         ? globalCacheCandidates(environment, windows: windows, macos: macos)
         : <DevFolder>[];
+    // Normalized once; looked up for every directory.
+    final globalByPath = {
+      for (final c in globalCaches) p.normalize(p.absolute(c.path)): c,
+    };
     final folderBytes = <String, int>{};
     var skipped = 0;
     var filesSeen = 0;
@@ -768,13 +792,15 @@ class LocalFolderScanner implements FolderScanner {
     var overflowBytes = 0;
     var overflowCount = 0;
     onProgress?.call(const ScanProgress(ScanPhase.discovering, 0, 0, 0));
-    Future<void> recordDevFolder(
+
+    /// Records a developer folder; false when the cap is reached.
+    Future<bool> recordDevFolder(
       DevFolder candidate,
       FileSystemEntity entity,
     ) async {
-      if (devFolders.length >= 200) {
+      if (devFolders.length >= maxDevFolders) {
         skipped++;
-        return;
+        return false;
       }
       final info = await entity.stat();
       devFolders.add(
@@ -789,121 +815,216 @@ class LocalFolderScanner implements FolderScanner {
         ),
       );
       folderBytes[candidate.path] = 0;
+      return true;
     }
 
-    DevFolder? globalFor(String path) {
-      for (final candidate in globalCaches) {
-        if (p.equals(
-          p.normalize(p.absolute(path)),
-          p.normalize(candidate.path),
-        )) {
-          return candidate;
-        }
+    DevFolder? globalFor(String path) =>
+        globalByPath.isEmpty ? null : globalByPath[p.normalize(path)];
+
+    void offerFile(LargeFile file) {
+      if (files.length >= 100 && file.bytes <= files.last.bytes) return;
+      // Keep the list sorted, largest first, at most 100 entries.
+      var i = files.length;
+      while (i > 0 && files[i - 1].bytes < file.bytes) {
+        i--;
       }
-      return null;
+      files.insert(i, file);
+      if (files.length > 100) files.removeLast();
     }
 
+    FolderScanResult snapshot([
+      Map<String, List<LargeFile>> matches = const {},
+    ]) => FolderScanResult(
+      List.unmodifiable(files.take(100)),
+      skipped,
+      cancelled(),
+      filesSeen: filesSeen,
+      totalBytes: categoryBytes.values.fold<int>(0, (sum, v) => sum + v),
+      duplicates: List.unmodifiable(
+        matches.values
+            .where((group) => group.length > 1)
+            .map((group) => List<LargeFile>.unmodifiable(group)),
+      ),
+      devFolders: List.unmodifiable(
+        devFolders.map(
+          (folder) => DevFolder(
+            folder.path,
+            folder.category,
+            folder.note,
+            logicalBytes: folderBytes[folder.path]!,
+            projectMarker: folder.projectMarker,
+            modified: folder.modified,
+            locationSource: folder.locationSource,
+            risk: folder.risk,
+          ),
+        ),
+      ),
+      storageCategories: List.unmodifiable(
+        (categoryBytes.entries
+            .map(
+              (entry) => StorageCategory(
+                entry.key,
+                entry.value,
+                categoryCounts[entry.key]!,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.bytes.compareTo(a.bytes))),
+      ),
+      folderSummaries: List.unmodifiable(
+        ([
+          for (final entry in topFolderBytes.entries)
+            FolderSummary(
+              entry.key,
+              entry.value,
+              topFolderCounts[entry.key]!,
+              folderPath: entry.key,
+            ),
+          if (rootCount > 0)
+            FolderSummary(
+              'Files directly in selected folder',
+              rootBytes,
+              rootCount,
+            ),
+          if (overflowCount > 0)
+            FolderSummary(
+              'Other folders (more than 5,000)',
+              overflowBytes,
+              overflowCount,
+            ),
+        ]..sort((a, b) => b.bytes.compareTo(a.bytes))).take(20),
+      ),
+    );
+
+    var rootDev = const <String>[];
     if (findDevFolders && !isExcluded(root.path)) {
       final match = globalFor(root.path);
-      if (match != null) await recordDevFolder(match, root);
+      if (match != null && await recordDevFolder(match, root)) {
+        rootDev = [match.path];
+      }
     }
-    while (pending.isNotEmpty && !cancelled()) {
-      final directory = pending.removeLast();
-      if (isExcluded(directory.path)) continue;
-      try {
-        if (await FileSystemEntity.type(directory.path, followLinks: false) !=
-            FileSystemEntityType.directory) {
-          skipped++;
-          continue;
-        }
-        await for (final entity in directory.list(followLinks: false)) {
-          if (cancelled()) break;
-          if (isExcluded(entity.path)) continue;
-          try {
-            final type = await FileSystemEntity.type(
-              entity.path,
-              followLinks: false,
-            );
-            if (type == FileSystemEntityType.directory) {
-              if (findDevFolders) {
-                final detected =
-                    globalFor(entity.path) ??
-                    await classifyDevFolder(entity.path);
-                if (detected != null) {
-                  await recordDevFolder(detected, entity);
-                }
+
+    // Folders still to read. Each carries its top-level folder (null for
+    // the selected folder itself) and the developer folders it is inside,
+    // so per-file work needs no path arithmetic.
+    final queue = <_WalkDir>[_WalkDir(root.path, null, rootDev)];
+    var active = 0;
+    Completer<void>? wake;
+    void wakeAll() {
+      final w = wake;
+      wake = null;
+      w?.complete();
+    }
+
+    final noExclusions = excluded.isEmpty;
+    var lastPartial = DateTime.now();
+
+    Future<void> visit(_WalkDir dir) async {
+      if (!noExclusions && isExcluded(dir.path)) return;
+      if (await FileSystemEntity.type(dir.path, followLinks: false) !=
+          FileSystemEntityType.directory) {
+        skipped++;
+        return;
+      }
+      await for (final entity in Directory(dir.path).list(followLinks: false)) {
+        if (cancelled()) break;
+        if (!noExclusions && isExcluded(entity.path)) continue;
+        try {
+          // list(followLinks: false) reports links as Link, never as the
+          // file or folder they point to; links are not followed.
+          if (entity is Directory) {
+            var inside = dir.devFolders;
+            if (findDevFolders) {
+              final detected =
+                  globalFor(entity.path) ??
+                  await classifyDevFolder(entity.path);
+              if (detected != null && await recordDevFolder(detected, entity)) {
+                inside = [...inside, detected.path];
               }
-              pending.add(Directory(entity.path));
-            } else if (type == FileSystemEntityType.file) {
-              final stat = await entity.stat();
-              if (stat.type == FileSystemEntityType.file) {
-                filesSeen++;
-                final category = categoryForPath(entity.path);
-                categoryBytes[category] =
-                    (categoryBytes[category] ?? 0) + stat.size;
-                categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
-                final relative = p.relative(entity.path, from: root.path);
-                final parts = p.split(relative);
-                if (parts.length == 1) {
-                  rootBytes += stat.size;
-                  rootCount++;
-                } else if (parts.isNotEmpty && parts.first != '..') {
-                  final top = p.join(root.path, parts.first);
-                  if (topFolderBytes.containsKey(top) ||
-                      topFolderBytes.length < 5000) {
-                    topFolderBytes[top] =
-                        (topFolderBytes[top] ?? 0) + stat.size;
-                    topFolderCounts[top] = (topFolderCounts[top] ?? 0) + 1;
-                  } else {
-                    overflowBytes += stat.size;
-                    overflowCount++;
-                  }
-                }
-                if (filesSeen % 128 == 0) {
-                  onProgress?.call(
-                    ScanProgress(ScanPhase.discovering, filesSeen, 0, 0),
-                  );
-                }
-                if (findDevFolders) {
-                  for (final folder in devFolders) {
-                    if (p.isWithin(folder.path, entity.path)) {
-                      folderBytes[folder.path] =
-                          folderBytes[folder.path]! + stat.size;
-                    }
-                  }
-                }
-                if (findDuplicates) {
-                  if (candidateCount < 20000) {
-                    candidates
-                        .putIfAbsent(stat.size, () => [])
-                        .add(_Candidate(entity.path, stat.size, stat.modified));
-                    candidateCount++;
-                  } else {
-                    skipped++;
-                  }
-                }
-                if (files.length < 100 || stat.size > files.last.bytes) {
-                  files.add(
-                    LargeFile(entity.path, stat.size, modified: stat.modified),
-                  );
-                  files.sort((a, b) => b.bytes.compareTo(a.bytes));
-                  if (files.length > 100) files.removeLast();
-                }
+            }
+            queue.add(_WalkDir(entity.path, dir.top ?? entity.path, inside));
+            wakeAll();
+          } else if (entity is File) {
+            final stat = await entity.stat();
+            if (stat.type != FileSystemEntityType.file) {
+              skipped++;
+              continue;
+            }
+            filesSeen++;
+            final size = stat.size;
+            final category = categoryForPath(entity.path);
+            categoryBytes[category] = (categoryBytes[category] ?? 0) + size;
+            categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+            final top = dir.top;
+            if (top == null) {
+              rootBytes += size;
+              rootCount++;
+            } else if (topFolderBytes.containsKey(top) ||
+                topFolderBytes.length < 5000) {
+              topFolderBytes[top] = (topFolderBytes[top] ?? 0) + size;
+              topFolderCounts[top] = (topFolderCounts[top] ?? 0) + 1;
+            } else {
+              overflowBytes += size;
+              overflowCount++;
+            }
+            for (final folder in dir.devFolders) {
+              folderBytes[folder] = folderBytes[folder]! + size;
+            }
+            if (findDuplicates) {
+              if (candidateCount < 20000) {
+                candidates
+                    .putIfAbsent(size, () => [])
+                    .add(_Candidate(entity.path, size, stat.modified));
+                candidateCount++;
               } else {
                 skipped++;
               }
-            } else {
-              skipped++;
             }
-          } on FileSystemException {
+            offerFile(LargeFile(entity.path, size, modified: stat.modified));
+            if (filesSeen % 128 == 0) {
+              onProgress?.call(
+                ScanProgress(ScanPhase.discovering, filesSeen, 0, 0),
+              );
+              final now = DateTime.now();
+              if (onPartial != null &&
+                  now.difference(lastPartial) > partialInterval) {
+                lastPartial = now;
+                onPartial(snapshot());
+              }
+            }
+          } else {
             skipped++;
           }
+        } on FileSystemException {
+          skipped++;
         }
-      } on FileSystemException {
-        skipped++;
       }
     }
-    files.sort((a, b) => b.bytes.compareTo(a.bytes));
+
+    // A few folders are read at once; the disk and OS caches handle
+    // parallel reads much better than one-at-a-time.
+    Future<void> worker() async {
+      while (!cancelled()) {
+        if (queue.isEmpty) {
+          if (active == 0) return;
+          await (wake ??= Completer<void>()).future;
+          continue;
+        }
+        final dir = queue.removeLast();
+        active++;
+        try {
+          await visit(dir);
+        } on FileSystemException {
+          skipped++;
+        } finally {
+          active--;
+          if (active == 0 && (queue.isEmpty || cancelled())) wakeAll();
+        }
+      }
+      wakeAll();
+    }
+
+    await Future.wait([for (var i = 0; i < parallelism; i++) worker()]);
     final matches = <String, List<LargeFile>>{};
     if (findDuplicates && !cancelled()) {
       final toCompare = candidates.values
@@ -975,74 +1096,21 @@ class LocalFolderScanner implements FolderScanner {
         if (cancelled()) break;
       }
     }
-    return FolderScanResult(
-      List.unmodifiable(files.take(100)),
-      skipped,
-      cancelled(),
-      filesSeen: filesSeen,
-      totalBytes: categoryBytes.values.fold<int>(0, (sum, v) => sum + v),
-      duplicates: List.unmodifiable(
-        matches.values
-            .where((group) => group.length > 1)
-            .map((group) => List<LargeFile>.unmodifiable(group)),
-      ),
-      devFolders: List.unmodifiable(
-        devFolders.map(
-          (folder) => DevFolder(
-            folder.path,
-            folder.category,
-            folder.note,
-            logicalBytes: folderBytes[folder.path]!,
-            projectMarker: folder.projectMarker,
-            modified: folder.modified,
-            locationSource: folder.locationSource,
-            risk: folder.risk,
-          ),
-        ),
-      ),
-      storageCategories: List.unmodifiable(
-        (categoryBytes.entries
-            .map(
-              (entry) => StorageCategory(
-                entry.key,
-                entry.value,
-                categoryCounts[entry.key]!,
-              ),
-            )
-            .toList()
-          ..sort((a, b) => b.bytes.compareTo(a.bytes))),
-      ),
-      folderSummaries: List.unmodifiable(
-        ([
-          for (final entry in topFolderBytes.entries)
-            FolderSummary(
-              entry.key,
-              entry.value,
-              topFolderCounts[entry.key]!,
-              folderPath: entry.key,
-            ),
-          if (rootCount > 0)
-            FolderSummary(
-              'Files directly in selected folder',
-              rootBytes,
-              rootCount,
-            ),
-          if (overflowCount > 0)
-            FolderSummary(
-              'Other folders (more than 5,000)',
-              overflowBytes,
-              overflowCount,
-            ),
-        ]..sort((a, b) => b.bytes.compareTo(a.bytes))).take(20),
-      ),
-    );
+    return snapshot(matches);
   }
 }
 
 class FolderScanViewModel extends ChangeNotifier {
-  FolderScanViewModel(this.scanner, this.pickFolder);
+  FolderScanViewModel(
+    this.scanner,
+    this.pickFolder, {
+    String? Function()? homeFolder,
+  }) : homeFolder = homeFolder ?? defaultHomeFolder;
   final FolderScanner scanner;
   final Future<String?> Function() pickFolder;
+
+  /// The default scope for [startDefault]: the user's home folder.
+  final String? Function() homeFolder;
 
   /// Called after a scan of a folder finishes without being cancelled.
   void Function(String root, FolderScanResult result)? onScanCompleted;
@@ -1053,6 +1121,10 @@ class FolderScanViewModel extends ChangeNotifier {
   String? root;
   String? error;
   FolderScanResult? result;
+
+  /// Results so far while a scan runs (null otherwise). Shown on Home so
+  /// people see the biggest items before the scan ends.
+  FolderScanResult? live;
   ScanProgress? progress;
   bool get cancelling => _cancelled;
   bool findDuplicates = false;
@@ -1149,7 +1221,25 @@ class FolderScanViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> start() async {
+  /// Scans the user's home folder without asking for a folder. Developer
+  /// folder detection is on; duplicate matching is left out (slow).
+  Future<void> startDefault() async {
+    if (busy) return;
+    final home = homeFolder();
+    if (home == null || home.isEmpty) {
+      error = 'Could not find your home folder. Choose a folder instead.';
+      notifyListeners();
+      return;
+    }
+    findDevFolders = true;
+    findDuplicates = false;
+    await _start(() async => home);
+  }
+
+  /// Asks for a folder, then scans it.
+  Future<void> start() => _start(pickFolder);
+
+  Future<void> _start(Future<String?> Function() choose) async {
     if (busy) return;
     busy = true;
     _cancelled = false;
@@ -1161,7 +1251,7 @@ class FolderScanViewModel extends ChangeNotifier {
     _selectedCleanupPaths.clear();
     notifyListeners();
     try {
-      final selected = await pickFolder();
+      final selected = await choose();
       if (_disposed || _cancelled || selected == null) return;
       root = selected;
       notifyListeners();
@@ -1190,7 +1280,14 @@ class FolderScanViewModel extends ChangeNotifier {
           notifyListeners();
         }
       },
+      onPartial: (snapshot) {
+        if (!_disposed && !_cancelled) {
+          live = snapshot;
+          notifyListeners();
+        }
+      },
     );
+    live = null;
     if (!_disposed) {
       result = scanned;
       if (!scanned.cancelled) onScanCompleted?.call(selected, scanned);
@@ -1301,6 +1398,12 @@ class FolderScanViewModel extends ChangeNotifier {
     _cancelled = true;
     super.dispose();
   }
+}
+
+/// The current user's home folder (HOME, or USERPROFILE on Windows).
+String? defaultHomeFolder() {
+  final env = Platform.environment;
+  return env['HOME'] ?? env['USERPROFILE'];
 }
 
 Future<String?> chooseFolder() =>

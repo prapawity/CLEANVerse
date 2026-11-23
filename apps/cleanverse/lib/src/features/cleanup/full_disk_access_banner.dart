@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:cleanverse/src/app/theme.dart';
-import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/features/cleanup/full_disk_access.dart';
 
 /// Optional macOS onboarding. Shown only when access is known to be
@@ -56,58 +55,66 @@ class _FullDiskAccessBannerState extends State<FullDiskAccessBanner> {
     if (dismissed || access != FullDiskAccess.denied) {
       return const SizedBox.shrink();
     }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: CvSpace.lg),
-      child: Panel(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    // Calm, dismissible note: one line of context and quiet text actions.
+    return Container(
+      margin: const EdgeInsets.only(bottom: CvSpace.lg),
+      padding: const EdgeInsets.fromLTRB(CvSpace.md, CvSpace.md, CvSpace.md, 4),
+      decoration: BoxDecoration(
+        color: CvColors.sunken,
+        borderRadius: BorderRadius.circular(CvRadius.sm),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.lock_outline_rounded,
+              size: 18,
+              color: CvColors.muted,
+            ),
+          ),
+          const SizedBox(width: CvSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.lock_outline_rounded, color: CvColors.amber),
-                const SizedBox(width: CvSpace.sm),
-                Expanded(
-                  child: Text(
-                    'Optional: allow Full Disk Access',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                const Text(
+                  'Optional: allow Full Disk Access',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'macOS protects some folders, such as Mail and Safari data, so CLEANVerse '
+                  'skips them and may show less than is there. Access never selects or '
+                  'removes anything, and nothing leaves this computer.',
+                  style: TextStyle(color: CvColors.muted, fontSize: 13),
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: CvSpace.xs),
+                  Semantics(liveRegion: true, child: Text(message!)),
+                ],
+                Wrap(
+                  spacing: CvSpace.xs,
+                  children: [
+                    TextButton(
+                      onPressed: _open,
+                      child: const Text('Open System Settings'),
+                    ),
+                    TextButton(
+                      onPressed: _check,
+                      child: const Text('Check again'),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => dismissed = true),
+                      child: const Text('Not now'),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: CvSpace.sm),
-            const Text(
-              'macOS protects some folders, such as Mail and Safari data. Without access, '
-              'CLEANVerse skips them and may show less than is there. You can keep using '
-              'CLEANVerse without it. Access never makes anything selected or removed '
-              'automatically, and nothing leaves this computer.',
-              style: TextStyle(color: CvColors.muted),
-            ),
-            if (message != null) ...[
-              const SizedBox(height: CvSpace.sm),
-              Semantics(liveRegion: true, child: Text(message!)),
-            ],
-            const SizedBox(height: CvSpace.md),
-            Wrap(
-              spacing: CvSpace.sm,
-              runSpacing: CvSpace.sm,
-              children: [
-                FilledButton.icon(
-                  onPressed: _open,
-                  icon: const Icon(Icons.settings_outlined),
-                  label: const Text('Open System Settings'),
-                ),
-                OutlinedButton(
-                  onPressed: _check,
-                  child: const Text('Check again'),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => dismissed = true),
-                  child: const Text('Not now'),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
