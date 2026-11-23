@@ -326,7 +326,12 @@ class _Progress extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             OutlinedButton(
-              onPressed: folderBusy && !model.cancelling ? model.cancel : null,
+              onPressed: folderBusy && !model.cancelling
+                  ? () {
+                      model.cancel();
+                      cleanup.cancelScan();
+                    }
+                  : null,
               child: Text(model.cancelling ? 'Cancelling…' : 'Cancel'),
             ),
             const Text(

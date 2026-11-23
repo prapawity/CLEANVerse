@@ -4,6 +4,7 @@
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
+import 'package:cleanverse/src/app/app_icon.dart';
 import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
 import 'package:cleanverse/src/data/removal.dart';
@@ -191,12 +192,20 @@ class _UninstallPageState extends State<UninstallPage> {
           ),
         ),
         const SizedBox(height: CvSpace.sm),
-        Semantics(
-          header: true,
-          child: Text(
-            app.name,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
+        Row(
+          children: [
+            AppIcon(app.path, size: 56),
+            const SizedBox(width: CvSpace.md),
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  app.name,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ),
+            ),
+          ],
         ),
         PathText(app.path),
         const SizedBox(height: CvSpace.lg),
@@ -307,6 +316,8 @@ class _AppRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
           child: Row(
             children: [
+              AppIcon(app.path, size: 32),
+              const SizedBox(width: CvSpace.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

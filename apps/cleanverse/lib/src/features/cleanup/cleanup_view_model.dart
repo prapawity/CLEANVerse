@@ -41,6 +41,13 @@ class CleanupViewModel extends ChangeNotifier {
   int progressTotal = 0;
 
   bool get busy => scanning || cleaning;
+  bool _stopScan = false;
+
+  /// Stops measuring further locations; what was measured is kept.
+  void cancelScan() {
+    if (scanning) _stopScan = true;
+  }
+
   bool isSelected(MeasuredJunk junk) => _selected.contains(junk.target.path);
   List<MeasuredJunk> get selected => [
     for (final junk in found ?? const <MeasuredJunk>[])
@@ -69,6 +76,7 @@ class CleanupViewModel extends ChangeNotifier {
   Future<void> scan({bool keepOutcomes = false}) async {
     if (busy) return;
     scanning = true;
+    _stopScan = false;
     error = null;
     if (!keepOutcomes) lastOutcomes = null;
     _selected.clear();
@@ -77,11 +85,12 @@ class CleanupViewModel extends ChangeNotifier {
       final targets = await loader();
       final measured = await Future.wait(
         targets.map((target) async {
+          if (_stopScan) return null;
           final type = await FileSystemEntity.type(
             target.path,
             followLinks: false,
           );
-          if (type != FileSystemEntityType.directory) return null;
+          if (type != FileSystemEntityType.directory || _stopScan) return null;
           final bytes = await measureBytes(
             target.path,
             skipNames: target.keepNames,
