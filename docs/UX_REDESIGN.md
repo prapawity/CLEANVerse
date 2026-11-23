@@ -57,6 +57,25 @@ Removed from top-level navigation: Smart Scan (now Home), Space Lens, Large & ol
 - Paths are single-line with middle ellipsis and a tooltip or copy action, not wrapped multi-line text.
 - Check every page at 1280×800, at 700 px wide and at 200% text, and with large data sets (500+ files, 100+ apps, 50+ junk locations).
 
+## Search and sort (all list pages)
+
+Every list uses the shared `ListToolbar` (`app/list_toolbar.dart`):
+
+- **Search box:** waits briefly after typing, then filters as you type. It has a clear button and ignores case. Every word must match the name, the path or a detail.
+- **Sort menu:** the options depend on the page:
+
+| Page | Search looks in | Sort options |
+| --- | --- | --- |
+| Biggest files | name, path | largest, smallest, oldest, newest, name |
+| Folders | folder name, path | largest, name, most files |
+| Duplicates | any copy's name or path (whole groups kept) | most space used, most copies, largest file, name |
+| Clean up | label, path, note (matching groups open) | largest, name, safest, riskiest |
+| Developer | tool, project, path, note (matching sections open) | largest, least recently changed, by type, path |
+| Apps | name, bundle ID | name, largest (frozen while sizes are measured) |
+
+- **While searching:** "Showing N of M" is shown, and "No matches" comes with a Clear search button.
+- **Narrow windows or large text:** the controls stack.
+
 ## Visual
 
 Keep the GITVerse family palette and system fonts (`VISUAL_DIRECTION.md`). Spend boldness in one place: the Home finding list, with large, confident size figures. Everything else is quieter: fewer outlined panels, fewer chips, one primary button per screen. Remove decorative icons that don't carry meaning.

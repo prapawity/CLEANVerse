@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:cleanverse/src/app/list_toolbar.dart';
+
 import 'package:cleanverse/src/data/removal.dart';
 import 'package:cleanverse/src/features/uninstall/app_catalog.dart';
 
@@ -55,10 +57,7 @@ class UninstallViewModel extends ChangeNotifier {
     final q = query.trim().toLowerCase();
     final list = [
       for (final a in apps ?? const <InstalledApp>[])
-        if (q.isEmpty ||
-            a.name.toLowerCase().contains(q) ||
-            a.bundleId.toLowerCase().contains(q))
-          a,
+        if (matchesQuery(q, [a.name, a.bundleId])) a,
     ];
     int byName(InstalledApp a, InstalledApp b) =>
         a.name.toLowerCase().compareTo(b.name.toLowerCase());

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:cleanverse/src/app/app.dart';
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/data/protection.dart';
 import 'package:cleanverse/src/features/settings/app_settings.dart';
 import 'package:cleanverse/src/data/removal.dart';
@@ -16,7 +17,7 @@ import 'package:cleanverse/src/features/scan/smart_scan_page.dart';
 
 enum LargeFileFilter { all, large, old }
 
-enum LargeFileSort { size, oldest }
+enum LargeFileSort { size, smallest, oldest, newest, name }
 
 /// Files not modified for this long count as "old". Modification time is
 /// used because last-opened time is unreliable across platforms.
@@ -56,6 +57,7 @@ class LargeFilesPage extends StatefulWidget {
 class _LargeFilesPageState extends State<LargeFilesPage> {
   LargeFileFilter filter = LargeFileFilter.all;
   LargeFileSort sort = LargeFileSort.size;
+  String query = '';
   int shown = largeFilesPageSize;
   final Set<String> selected = {};
 
@@ -92,6 +94,9 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
     final ignored = activeIgnoreList;
     final list = files.where((file) {
       if (ignored?.covers(file.path) ?? false) return false;
+      if (!matchesQuery(query, [p.basename(file.path), file.path])) {
+        return false;
+      }
       return switch (filter) {
         LargeFileFilter.all => true,
         LargeFileFilter.large => file.bytes >= largeFileThreshold,
@@ -99,63 +104,74 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
           file.modified != null && now.difference(file.modified!) >= oldFileAge,
       };
     }).toList();
-    if (sort == LargeFileSort.oldest) {
-      list.sort((a, b) {
-        final am = a.modified, bm = b.modified;
-        if (am == null && bm == null) return b.bytes.compareTo(a.bytes);
-        if (am == null) return 1;
-        if (bm == null) return -1;
-        final byAge = am.compareTo(bm);
-        return byAge != 0 ? byAge : b.bytes.compareTo(a.bytes);
-      });
+    int bySize(LargeFile a, LargeFile b) => b.bytes.compareTo(a.bytes);
+    int byDate(LargeFile a, LargeFile b, {required bool oldest}) {
+      final am = a.modified, bm = b.modified;
+      if (am == null && bm == null) return bySize(a, b);
+      if (am == null) return 1; // unknown age goes last either way
+      if (bm == null) return -1;
+      final c = oldest ? am.compareTo(bm) : bm.compareTo(am);
+      return c != 0 ? c : bySize(a, b);
+    }
+
+    switch (sort) {
+      case LargeFileSort.size:
+        list.sort(bySize);
+      case LargeFileSort.smallest:
+        list.sort((a, b) => a.bytes.compareTo(b.bytes));
+      case LargeFileSort.oldest:
+        list.sort((a, b) => byDate(a, b, oldest: true));
+      case LargeFileSort.newest:
+        list.sort((a, b) => byDate(a, b, oldest: false));
+      case LargeFileSort.name:
+        list.sort(
+          (a, b) => p
+              .basename(a.path)
+              .toLowerCase()
+              .compareTo(p.basename(b.path).toLowerCase()),
+        );
     }
     return list;
   }
 
-  Widget _controls() => Wrap(
-    spacing: CvSpace.md,
-    runSpacing: CvSpace.sm,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SegmentedButton<LargeFileFilter>(
-          segments: const [
-            ButtonSegment(value: LargeFileFilter.all, label: Text('All')),
-            ButtonSegment(value: LargeFileFilter.large, label: Text('50 MiB+')),
-            ButtonSegment(
-              value: LargeFileFilter.old,
-              label: Text('Older than a year'),
-            ),
-          ],
-          selected: {filter},
-          showSelectedIcon: false,
-          onSelectionChanged: (value) => setState(() {
-            filter = value.first;
-            shown = largeFilesPageSize;
-          }),
-        ),
-      ),
-      DropdownButton<LargeFileSort>(
-        value: sort,
-        underline: const SizedBox.shrink(),
-        borderRadius: BorderRadius.circular(CvRadius.sm),
-        items: const [
-          DropdownMenuItem(
-            value: LargeFileSort.size,
-            child: Text('Largest first'),
-          ),
-          DropdownMenuItem(
-            value: LargeFileSort.oldest,
-            child: Text('Oldest first'),
+  Widget _controls() => ListToolbar<LargeFileSort>(
+    hint: 'Search by name or folder',
+    initialQuery: query,
+    onQuery: (v) => setState(() {
+      query = v;
+      shown = largeFilesPageSize;
+    }),
+    sort: sort,
+    sortOptions: const [
+      SortOption(LargeFileSort.size, 'Largest first'),
+      SortOption(LargeFileSort.smallest, 'Smallest first'),
+      SortOption(LargeFileSort.oldest, 'Oldest first'),
+      SortOption(LargeFileSort.newest, 'Newest first'),
+      SortOption(LargeFileSort.name, 'Name A to Z'),
+    ],
+    onSort: (v) => setState(() {
+      sort = v;
+      shown = largeFilesPageSize;
+    }),
+    trailing: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<LargeFileFilter>(
+        segments: const [
+          ButtonSegment(value: LargeFileFilter.all, label: Text('All')),
+          ButtonSegment(value: LargeFileFilter.large, label: Text('50 MiB+')),
+          ButtonSegment(
+            value: LargeFileFilter.old,
+            label: Text('Older than a year'),
           ),
         ],
-        onChanged: (value) => setState(() {
-          sort = value ?? LargeFileSort.size;
+        selected: {filter},
+        showSelectedIcon: false,
+        onSelectionChanged: (value) => setState(() {
+          filter = value.first;
           shown = largeFilesPageSize;
         }),
       ),
-    ],
+    ),
   );
 
   @override
@@ -199,9 +215,16 @@ class _LargeFilesPageState extends State<LargeFilesPage> {
             ),
           const SizedBox(height: CvSpace.md),
           _controls(),
+          MatchCount(
+            shown: visible.length,
+            total: result.files.length,
+            active: query.isNotEmpty || filter != LargeFileFilter.all,
+          ),
           const SizedBox(height: CvSpace.md),
           if (result.files.isEmpty)
             const Text('No files found in the scanned scope.')
+          else if (visible.isEmpty && query.isNotEmpty)
+            NoMatches(query: query, onClear: () => setState(() => query = ''))
           else if (visible.isEmpty)
             const Text(
               'No files match this filter. Choose All to see every file.',

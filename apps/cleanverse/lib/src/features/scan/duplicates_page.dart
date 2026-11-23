@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/data/removal.dart';
 import 'package:cleanverse/src/features/cleanup/removal_dialog.dart';
@@ -31,7 +32,11 @@ class DuplicatesPage extends StatefulWidget {
   State<DuplicatesPage> createState() => _DuplicatesPageState();
 }
 
+enum DuplicateSort { space, copies, fileSize, name }
+
 class _DuplicatesPageState extends State<DuplicatesPage> {
+  String query = '';
+  DuplicateSort sort = DuplicateSort.space;
   final Set<String> selected = {};
 
   /// Group keys (first path) the user expanded or collapsed explicitly.
@@ -121,8 +126,30 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
           (a, b) =>
               (b.first.bytes * b.length).compareTo(a.first.bytes * a.length),
         );
-      final count = groups.length < shown ? groups.length : shown;
-      final collapseByDefault = groups.length > 3;
+      // Search and sort whole groups; the order inside a group (first copy
+      // is the one kept) never changes.
+      final listed = [
+        for (final g in groups)
+          if (g.any((f) => matchesQuery(query, [p.basename(f.path), f.path])))
+            g,
+      ];
+      switch (sort) {
+        case DuplicateSort.space:
+          break; // groups is already sorted by space used
+        case DuplicateSort.copies:
+          listed.sort((a, b) => b.length.compareTo(a.length));
+        case DuplicateSort.fileSize:
+          listed.sort((a, b) => b.first.bytes.compareTo(a.first.bytes));
+        case DuplicateSort.name:
+          listed.sort(
+            (a, b) => p
+                .basename(a.first.path)
+                .toLowerCase()
+                .compareTo(p.basename(b.first.path).toLowerCase()),
+          );
+      }
+      final count = listed.length < shown ? listed.length : shown;
+      final collapseByDefault = listed.length > 3 && query.isEmpty;
       final extraBytes = groups.fold<int>(
         0,
         (s, g) => s + g.first.bytes * (g.length - 1),
@@ -153,13 +180,45 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                 tone: CalloutTone.caution,
               ),
             ),
-          if (groups.isNotEmpty)
+          if (groups.isNotEmpty) ...[
+            const SizedBox(height: CvSpace.md),
+            ListToolbar<DuplicateSort>(
+              hint: 'Search by file name or folder',
+              initialQuery: query,
+              onQuery: (v) => setState(() {
+                query = v;
+                shown = duplicateGroupPageSize;
+              }),
+              sort: sort,
+              sortOptions: const [
+                SortOption(DuplicateSort.space, 'Most space used'),
+                SortOption(DuplicateSort.copies, 'Most copies'),
+                SortOption(DuplicateSort.fileSize, 'Largest file'),
+                SortOption(DuplicateSort.name, 'Name A to Z'),
+              ],
+              onSort: (v) => setState(() {
+                sort = v;
+                shown = duplicateGroupPageSize;
+              }),
+            ),
+            MatchCount(
+              shown: listed.length,
+              total: groups.length,
+              active: query.isNotEmpty,
+            ),
+            if (listed.isEmpty && query.isNotEmpty)
+              NoMatches(
+                query: query,
+                onClear: () => setState(() => query = ''),
+              ),
+          ],
+          if (listed.isNotEmpty)
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
                 onPressed: model.busy
                     ? null
-                    : () => selectAllButFirst(groups.take(count).toList()),
+                    : () => selectAllButFirst(listed.take(count).toList()),
                 child: const Text('Select all but one copy in each group'),
               ),
             ),
@@ -168,7 +227,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
           SliverList.builder(
             itemCount: count,
             itemBuilder: (context, i) {
-              final group = groups[i];
+              final group = listed[i];
               final key = group.first.path;
               return _Group(
                 group: group,
@@ -185,10 +244,10 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
               );
             },
           ),
-          if (groups.length > count)
+          if (listed.length > count)
             SliverToBoxAdapter(
               child: ShowMoreButton(
-                remaining: groups.length - count,
+                remaining: listed.length - count,
                 onPressed: () =>
                     setState(() => shown += duplicateGroupPageSize),
               ),

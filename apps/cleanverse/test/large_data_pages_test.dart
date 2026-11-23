@@ -208,6 +208,20 @@ void main() {
       return model;
     }
 
+    testWidgets('search opens matching groups and narrows rows', (
+      tester,
+    ) async {
+      await pumpCleanup(tester);
+      await tester.tap(find.text('Review all'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'location 42');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+      expect(find.text('Showing 1 of 80'), findsOneWidget);
+      expect(find.text('Junk location 42'), findsOneWidget);
+      expect(find.text('Junk location 41'), findsNothing);
+    });
+
     testWidgets('simple view first, groups collapsed, rows lazy', (
       tester,
     ) async {
@@ -296,18 +310,20 @@ void main() {
       expect(measure.maxInFlight, lessThanOrEqualTo(model.sizeConcurrency));
       expect(model.appSizes.length, 150);
       expect(find.text('Measuring…'), findsNothing);
-      await tester.tap(find.text('Size'));
-      await tester.pump();
+      await tester.tap(find.text('Name A to Z'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Largest first').last);
+      await tester.pumpAndSettle();
       final first = model.visibleApps.first;
       expect(
         model.appSizes[first.path],
         model.appSizes.values.reduce((a, b) => a > b ? a : b),
       );
       await tester.enterText(find.byType(TextField), 'App 149');
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300)); // search debounce
       expect(model.visibleApps, hasLength(1));
       await tester.enterText(find.byType(TextField), '');
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       await scrollTo(tester, find.textContaining('App 149'));
     });
 
@@ -405,6 +421,16 @@ void main() {
       );
       return (model, scanner);
     }
+
+    testWidgets('search finds folders across sections', (tester) async {
+      await pumpDev(tester);
+      await tester.enterText(find.byType(TextField), 'gradle');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+      final shown = find.textContaining(RegExp(r'^Showing \d+ of 300'));
+      expect(shown, findsOneWidget);
+      expect(find.textContaining('Node.js dependencies'), findsNothing);
+    });
 
     testWidgets('without a scan, one action scans the home folder', (
       tester,

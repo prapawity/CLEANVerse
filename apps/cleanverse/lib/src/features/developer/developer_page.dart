@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
@@ -49,8 +50,47 @@ class DeveloperPage extends StatefulWidget {
   State<DeveloperPage> createState() => _DeveloperPageState();
 }
 
+enum DevSort { size, name, oldest, kind }
+
 class _DeveloperPageState extends State<DeveloperPage> {
   static const _pageSize = 50;
+  String query = '';
+  DevSort sort = DevSort.size;
+
+  List<DevFolder> _arrange(Iterable<DevFolder> folders) {
+    final list = [
+      for (final f in folders)
+        if (matchesQuery(query, [f.category, f.path, f.projectMarker, f.note]))
+          f,
+    ];
+    int bySize(DevFolder a, DevFolder b) =>
+        b.logicalBytes.compareTo(a.logicalBytes);
+    switch (sort) {
+      case DevSort.size:
+        list.sort(bySize);
+      case DevSort.name:
+        list.sort(
+          (a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()),
+        );
+      case DevSort.oldest:
+        // Least recently changed first; unknown dates last.
+        list.sort((a, b) {
+          final am = a.modified, bm = b.modified;
+          if (am == null && bm == null) return bySize(a, b);
+          if (am == null) return 1;
+          if (bm == null) return -1;
+          final c = am.compareTo(bm);
+          return c != 0 ? c : bySize(a, b);
+        });
+      case DevSort.kind:
+        list.sort((a, b) {
+          final c = a.category.compareTo(b.category);
+          return c != 0 ? c : bySize(a, b);
+        });
+    }
+    return list;
+  }
+
   FolderScanViewModel get model => widget.model;
 
   /// Explicit user choices; otherwise short sections start open.
@@ -68,14 +108,8 @@ class _DeveloperPageState extends State<DeveloperPage> {
       final scanning = model.busy && model.root != null;
       final haveDev = result != null && model.findDevFolders && !scanning;
       final folders = haveDev ? result.devFolders : const <DevFolder>[];
-      final projects = [
-        for (final f in folders)
-          if (f.projectMarker != null) f,
-      ];
-      final tools = [
-        for (final f in folders)
-          if (f.projectMarker == null) f,
-      ];
+      final projects = _arrange(folders.where((f) => f.projectMarker != null));
+      final tools = _arrange(folders.where((f) => f.projectMarker == null));
       return PageScroll(
         children: [
           const PageHeader(
@@ -88,8 +122,41 @@ class _DeveloperPageState extends State<DeveloperPage> {
             ScanProgressPanel(model: model)
           else if (!haveDev)
             _ScanPrompt(model: model, hasOtherResult: result != null)
-          else
+          else ...[
             _ScanSummary(model: model, result: result),
+            if (folders.isNotEmpty) ...[
+              const SizedBox(height: CvSpace.lg),
+              ListToolbar<DevSort>(
+                hint: 'Search by tool, project or path',
+                initialQuery: query,
+                onQuery: (v) => setState(() {
+                  query = v;
+                  _shown.clear();
+                }),
+                sort: sort,
+                sortOptions: const [
+                  SortOption(DevSort.size, 'Largest first'),
+                  SortOption(DevSort.oldest, 'Least recently changed'),
+                  SortOption(DevSort.kind, 'By type'),
+                  SortOption(DevSort.name, 'Path A to Z'),
+                ],
+                onSort: (v) => setState(() {
+                  sort = v;
+                  _shown.clear();
+                }),
+              ),
+              MatchCount(
+                shown: projects.length + tools.length,
+                total: folders.length,
+                active: query.isNotEmpty,
+              ),
+              if (query.isNotEmpty && projects.isEmpty && tools.isEmpty)
+                NoMatches(
+                  query: query,
+                  onClear: () => setState(() => query = ''),
+                ),
+            ],
+          ],
         ],
         slivers: [
           if (haveDev) ...[
@@ -201,7 +268,9 @@ class _DeveloperPageState extends State<DeveloperPage> {
     List<DevFolder> items, {
     Widget? footer,
   }) {
-    final open = _isOpen(id, items.length);
+    // A search opens every section that has matches.
+    final open =
+        (query.isNotEmpty && items.isNotEmpty) || _isOpen(id, items.length);
     final bytes = items.fold<int>(0, (s, f) => s + f.logicalBytes);
     final shown = math.min(items.length, _limit(id));
     return [

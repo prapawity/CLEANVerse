@@ -4,6 +4,7 @@
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
@@ -80,9 +81,44 @@ class CleanupPage extends StatefulWidget {
   State<CleanupPage> createState() => _CleanupPageState();
 }
 
+enum JunkSort { size, name, safest, riskiest }
+
 class _CleanupPageState extends State<CleanupPage> {
   CleanupViewModel get model => widget.model;
   bool _review = false;
+  String query = '';
+  JunkSort sort = JunkSort.size;
+
+  /// Items of [group] matching the search, in the chosen order.
+  List<MeasuredJunk> _listed(JunkGroup group) {
+    final items = [
+      for (final j in model.inGroup(group))
+        if (matchesQuery(query, [j.target.label, j.target.path, j.target.note]))
+          j,
+    ];
+    switch (sort) {
+      case JunkSort.size:
+        items.sort((a, b) => b.bytes.compareTo(a.bytes));
+      case JunkSort.name:
+        items.sort(
+          (a, b) => a.target.label.toLowerCase().compareTo(
+            b.target.label.toLowerCase(),
+          ),
+        );
+      case JunkSort.safest:
+        items.sort((a, b) {
+          final c = a.target.risk.index.compareTo(b.target.risk.index);
+          return c != 0 ? c : b.bytes.compareTo(a.bytes);
+        });
+      case JunkSort.riskiest:
+        items.sort((a, b) {
+          final c = b.target.risk.index.compareTo(a.target.risk.index);
+          return c != 0 ? c : b.bytes.compareTo(a.bytes);
+        });
+    }
+    return items;
+  }
+
   final Set<JunkGroup> _expanded = {};
 
   @override
@@ -149,21 +185,49 @@ class _CleanupPageState extends State<CleanupPage> {
             onCleanSafe: () => _confirm('Clean safe junk', model.safe),
             onToggleReview: () => setState(() => _review = !_review),
           ),
+          if (showList) ...[
+            const SizedBox(height: CvSpace.lg),
+            ListToolbar<JunkSort>(
+              hint: 'Search locations',
+              initialQuery: query,
+              onQuery: (v) => setState(() => query = v),
+              sort: sort,
+              sortOptions: const [
+                SortOption(JunkSort.size, 'Largest first'),
+                SortOption(JunkSort.name, 'Name A to Z'),
+                SortOption(JunkSort.safest, 'Safest first'),
+                SortOption(JunkSort.riskiest, 'Riskiest first'),
+              ],
+              onSort: (v) => setState(() => sort = v),
+            ),
+            MatchCount(
+              shown: [for (final g in JunkGroup.values) ..._listed(g)].length,
+              total: found.length,
+              active: query.isNotEmpty,
+            ),
+            if (query.isNotEmpty &&
+                JunkGroup.values.every((g) => _listed(g).isEmpty))
+              NoMatches(
+                query: query,
+                onClear: () => setState(() => query = ''),
+              ),
+          ],
         ],
         slivers: [
           if (showList) ...[
             for (final group in JunkGroup.values)
-              if (model.inGroup(group).isNotEmpty) ...[
+              if (_listed(group).isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _GroupHeader(
                     model: model,
                     group: group,
-                    expanded: _expanded.contains(group),
+                    // A search opens every group that has matches.
+                    expanded: query.isNotEmpty || _expanded.contains(group),
                     onToggle: () => _toggleGroup(group),
                   ),
                 ),
-                if (_expanded.contains(group))
-                  _groupItems(model.inGroup(group)),
+                if (query.isNotEmpty || _expanded.contains(group))
+                  _groupItems(_listed(group)),
               ],
             const SliverToBoxAdapter(
               child: Padding(

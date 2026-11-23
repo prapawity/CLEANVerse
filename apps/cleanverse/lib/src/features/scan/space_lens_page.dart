@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/app/app.dart';
 import 'package:cleanverse/src/data/scan_history.dart';
 import 'package:cleanverse/src/features/scan/desktop_scan.dart';
@@ -36,8 +37,12 @@ class SpaceLensPage extends StatefulWidget {
   State<SpaceLensPage> createState() => _SpaceLensPageState();
 }
 
+enum FolderSort { size, name, files }
+
 class _SpaceLensPageState extends State<SpaceLensPage> {
   int shown = folderPageSize;
+  String query = '';
+  FolderSort sort = FolderSort.size;
   String? _shownRoot;
 
   FolderScanViewModel get model => widget.model;
@@ -56,6 +61,7 @@ class _SpaceLensPageState extends State<SpaceLensPage> {
       if (_shownRoot != model.root) {
         _shownRoot = model.root;
         shown = folderPageSize;
+        query = '';
       }
       final result = model.result!;
       final partial = result.cancelled || result.skipped > 0;
@@ -63,7 +69,26 @@ class _SpaceLensPageState extends State<SpaceLensPage> {
       final categories = result.storageCategories;
       final folderTotal = folders.fold<int>(0, (s, f) => s + f.bytes);
       final categoryTotal = categories.fold<int>(0, (s, c) => s + c.bytes);
-      final count = folders.length < shown ? folders.length : shown;
+      // Keep each folder's original rank so its colour matches the treemap.
+      final listed = [
+        for (var i = 0; i < folders.length; i++)
+          if (matchesQuery(query, [folders[i].label, folders[i].folderPath]))
+            (i, folders[i]),
+      ];
+      switch (sort) {
+        case FolderSort.size:
+          break; // already largest first
+        case FolderSort.name:
+          listed.sort(
+            (a, b) =>
+                displayName(a.$2.label)
+                    .toLowerCase()
+                    .compareTo(displayName(b.$2.label).toLowerCase()),
+          );
+        case FolderSort.files:
+          listed.sort((a, b) => b.$2.fileCount.compareTo(a.$2.fileCount));
+      }
+      final count = listed.length < shown ? listed.length : shown;
       final busy = model.busy;
       VoidCallback? explore(FolderSummary f) => f.folderPath == null || busy
           ? null
@@ -137,22 +162,56 @@ class _SpaceLensPageState extends State<SpaceLensPage> {
               ],
             ),
             const SizedBox(height: CvSpace.md),
+            ListToolbar<FolderSort>(
+              hint: 'Search folders',
+              initialQuery: query,
+              onQuery: (v) => setState(() {
+                query = v;
+                shown = folderPageSize;
+              }),
+              sort: sort,
+              sortOptions: const [
+                SortOption(FolderSort.size, 'Largest first'),
+                SortOption(FolderSort.name, 'Name A to Z'),
+                SortOption(FolderSort.files, 'Most files'),
+              ],
+              onSort: (v) => setState(() {
+                sort = v;
+                shown = folderPageSize;
+              }),
+            ),
+            MatchCount(
+              shown: listed.length,
+              total: folders.length,
+              active: query.isNotEmpty,
+            ),
+            if (listed.isEmpty && query.isNotEmpty)
+              NoMatches(
+                query: query,
+                onClear: () => setState(() => query = ''),
+              ),
+            const SizedBox(height: CvSpace.sm),
           ],
         ],
         slivers: [
           SliverList.builder(
             itemCount: count,
-            itemBuilder: (context, i) => _FolderRow(
-              summary: folders[i],
-              color: i < _treemapTiles ? CvColors.seriesAt(i) : CvColors.muted,
-              share: folderTotal == 0 ? 0 : folders[i].bytes / folderTotal,
-              onExplore: explore(folders[i]),
-            ),
+            itemBuilder: (context, i) {
+              final (rank, folder) = listed[i];
+              return _FolderRow(
+                summary: folder,
+                color: rank < _treemapTiles
+                    ? CvColors.seriesAt(rank)
+                    : CvColors.muted,
+                share: folderTotal == 0 ? 0 : folder.bytes / folderTotal,
+                onExplore: explore(folder),
+              );
+            },
           ),
-          if (folders.length > count)
+          if (listed.length > count)
             SliverToBoxAdapter(
               child: ShowMoreButton(
-                remaining: folders.length - count,
+                remaining: listed.length - count,
                 onPressed: () => setState(() => shown += folderPageSize),
               ),
             ),

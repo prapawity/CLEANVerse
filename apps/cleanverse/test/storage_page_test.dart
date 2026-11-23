@@ -272,4 +272,55 @@ void main() {
       }
     });
   }
+
+  group('search and sort', () {
+    Future<void> search(WidgetTester tester, String q) async {
+      await tester.enterText(find.byType(TextField), q);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('biggest files: search narrows, sort reorders', (tester) async {
+      final model = await _model(tester);
+      await _pump(tester, _storage(model));
+      await search(tester, 'file_1999');
+      expect(find.text('Showing 1 of 2,000'), findsNothing);
+      expect(find.textContaining('Showing 1 of 2000'), findsOneWidget);
+      expect(find.text('file_1999.bin'), findsOneWidget);
+
+      await search(tester, '');
+      await tester.tap(find.text('Largest first'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Smallest first').last);
+      await tester.pumpAndSettle();
+      expect(find.text('file_1999.bin'), findsOneWidget);
+      expect(find.text('file_0.bin'), findsNothing);
+    });
+
+    testWidgets('no matches offers a way out', (tester) async {
+      final model = await _model(tester);
+      await _pump(tester, _storage(model));
+      await search(tester, 'nothing-like-this');
+      expect(find.text('No matches for "nothing-like-this".'), findsOneWidget);
+      await tester.tap(find.text('Clear search'));
+      await tester.pumpAndSettle();
+      expect(find.text('file_0.bin'), findsOneWidget);
+    });
+
+    testWidgets('folders: search by folder name', (tester) async {
+      final model = await _model(tester);
+      await _pump(tester, _storage(model, tab: 1));
+      await search(tester, 'folder_15');
+      // folder_15 and folder_150 … folder_159
+      expect(find.textContaining('Showing 11 of 200'), findsOneWidget);
+    });
+
+    testWidgets('duplicates: search keeps whole groups', (tester) async {
+      final model = await _model(tester, duplicates: true);
+      await _pump(tester, _storage(model, tab: 2));
+      await search(tester, 'dup_7');
+      // dup_7 and dup_70 … dup_79
+      expect(find.textContaining('Showing 11 of 300'), findsOneWidget);
+    });
+  });
 }

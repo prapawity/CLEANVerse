@@ -4,6 +4,7 @@
 // ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 
+import 'package:cleanverse/src/app/list_toolbar.dart';
 import 'package:cleanverse/src/app/app_icon.dart';
 import 'package:cleanverse/src/app/theme.dart';
 import 'package:cleanverse/src/app/ui.dart';
@@ -119,42 +120,30 @@ class _UninstallPageState extends State<UninstallPage> {
         if (loading)
           const LinearProgressIndicator()
         else ...[
-          TextField(
-            controller: _search,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search_rounded),
-              hintText: 'Search apps',
-            ),
-            onChanged: model.setQuery,
-          ),
-          const SizedBox(height: CvSpace.md),
-          Wrap(
-            spacing: CvSpace.md,
-            runSpacing: CvSpace.sm,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                '${plural(apps.length, 'app')}${model.measuringSizes ? ' · measuring sizes…' : ''}. '
-                'Apple apps are not listed.',
-                style: const TextStyle(color: CvColors.muted, fontSize: 12),
-              ),
-              SegmentedButton<AppSort>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: AppSort.name, label: Text('Name')),
-                  ButtonSegment(value: AppSort.size, label: Text('Size')),
-                ],
-                selected: {model.sort},
-                onSelectionChanged: (v) => model.setSort(v.first),
-              ),
+          ListToolbar<AppSort>(
+            hint: 'Search apps by name or ID',
+            initialQuery: model.query,
+            onQuery: model.setQuery,
+            sort: model.sort,
+            sortOptions: const [
+              SortOption(AppSort.name, 'Name A to Z'),
+              SortOption(AppSort.size, 'Largest first'),
             ],
+            onSort: model.setSort,
           ),
           const SizedBox(height: CvSpace.sm),
-          if (apps.isEmpty)
+          Text(
+            '${plural(apps.length, 'app')}${model.measuringSizes ? ' · measuring sizes…' : ''}. '
+            'Apple apps are not listed.',
+            style: const TextStyle(color: CvColors.muted, fontSize: 12),
+          ),
+          const SizedBox(height: CvSpace.sm),
+          if (apps.isEmpty && model.query.isNotEmpty)
+            NoMatches(query: model.query, onClear: () => model.setQuery(''))
+          else if (apps.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: CvSpace.md),
-              child: Text('No apps match.'),
+              child: Text('No apps found.'),
             ),
         ],
       ],
